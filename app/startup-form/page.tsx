@@ -153,8 +153,7 @@ function FormContent() {
         tips_info: formData.tipsInfo,
         parent_id: folderId,
         support_needs: Object.keys(supportChecks).filter(k => supportChecks[k]),
-        support_needs_other: supportOther,
-        logo_url: uploadedLogoUrl
+        support_needs_other: supportOther
       }]).select().single();
 
       if (startupError) throw startupError;
@@ -208,7 +207,7 @@ function FormContent() {
       <section className="mb-10">
         <SectionTitle title="□ 개요" />
         <div className="grid grid-cols-12 border-t border-gray-400">
-          <div className="col-span-10 grid grid-cols-6">
+          <div className="col-span-12 grid grid-cols-6">
             <Label className="col-span-1">기업명*</Label>
             <Content className="col-span-2"><input type="text" name="companyName" value={formData.companyName} onChange={handleChange} className="w-full border p-1 font-bold outline-none" /></Content>
             <Label className="col-span-1">설립일</Label>
@@ -218,10 +217,7 @@ function FormContent() {
             <Label className="col-span-1">회사이메일</Label>
             <Content className="col-span-2"><input type="email" name="companyEmail" value={formData.companyEmail} onChange={handleChange} className="w-full border p-1 outline-none" /></Content>
           </div>
-          <div className="col-span-2 border-l border-b border-gray-300 flex flex-col items-center justify-center p-2 bg-gray-50 cursor-pointer" onClick={() => document.getElementById('logoInput')?.click()}>
-            {logoImage ? <img src={logoImage} alt="Logo" className="w-full h-full object-contain" /> : <div className="text-gray-400 font-bold text-[10px] text-center uppercase">Logo (Click)</div>}
-            <input type="file" id="logoInput" className="hidden" onChange={handleLogoUpload} />
-          </div>
+
           <div className="col-span-12 grid grid-cols-12 border-b border-gray-300">
             <Label className="col-span-2">회사주소</Label>
             <Content className="col-span-10"><input type="text" name="companyAddress" value={formData.companyAddress} onChange={handleChange} className="w-full border p-1 outline-none" /></Content>

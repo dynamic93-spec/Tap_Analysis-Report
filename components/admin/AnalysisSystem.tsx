@@ -47,7 +47,14 @@ const DEFAULT_QUESTIONS: Record<string, any[]> = {
     { id: 'fin_2', label: '특허 주체 및 권리 안정성', guide: '① 없음\n② 1개 이상\n③ 3개 이상\n④ 5개 이상\n⑤ 10개 이상' }, 
     { id: 'fin_3', label: '기술 사업화 수준', guide: '① 주관하지 않았고 유관성 없음\n② 특허 포트폴리오가 대표가 주관하였지만 사업유관성이 없음\n③ 특허 포트폴리오가 대표가 주관하지는 않았지만 사업유관성이 있음\n④ 특허 포트폴리오가  대표가 주관하였고 사업유관성도 있지만 향후 추가 계획은 없음\n⑤ 주관하였고 유관성 있으며 향후 계획 있음' },
     { id: 'fin_4', label: 'IP 리스크 관리 체계', guide: '① 없음\n② 1건\n③ 2건\n④ 3~4건\n⑤ 5개 이상' },
-  ]
+  ],
+  '글로벌 진출 역량': [
+    { id: 'glo_1', label: '글로벌 시장 적합성', guide: '① 글로벌 전략 부재\n② 막연한 글로벌 진출 의사\n③ 진출 대상국 확정 및 현지 조사 완료\n④ 타겟 국가별 비즈니스 모델 최적화 완료\n⑤ 현지화 제품 기반 시장 점유 가속화' },
+    { id: 'glo_2', label: '글로벌 파트너십 확장성', guide: '① 협력 네트워크 전무\n② 네트워크 확보 시도 단계\n③ 해외 전시회 참가 및 잠재 바이어 DB 확보\n④ 현지 대형 파트너사와 전략적 제휴(MOU 이상)\n⑤ 현지 유통/솔루션 파트너와 매출 공유 모델 작동' }, 
+    { id: 'glo_3', label: '해외 트랙션', guide: '① 해외 진출 시도 없음\n② 해외 문의 발생 수준\n③ 샘플 수출 또는 글로벌 전시 성과 도출\n④ 해외 현지 파일럿(PoC) 성공 및 본 계약 협의\n⑤ 해외 매출 비중이 전체의 20% 이상 달성' },
+    { id: 'glo_4', label: '글로벌 인적 인프라', guide: '① 전담 인력 및 역량 부재\n② 겸직 인력 위주의 대응\n③ 외국어 및 글로벌 업무 가능 인력 확보\n④ 글로벌 사업 전담 조직 및 해외 거점 확보\n⑤ 해외 법인 설립 및 현지 리더십 채용 완료' },
+    { id: 'glo_5', label: '글로벌 규제 및 수출 체계', guide: '① 전담 인력 및 역량 부재\n② 규제 정보 부족 및 대응 역량 미흡\n③ 글로벌 인증 준비 및 수출입 프로세스 설계\n④ 진출국 법률/세무/규제 검토 및 대응책 마련\n⑤ 국가별 필수 인증 및 통관 시스템 완비' },
+  ],
 };
 
 export default function AnalysisSystem({ selectedItem, onClose, onSave }: AnalysisSystemProps) {
@@ -56,7 +63,7 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
   const [comment, setComment] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
 
-  const [fixedTabs] = useState<string[]>(['사업성', '팀역량', '기술성', '시장성', '지식재산권']);
+  const [fixedTabs] = useState<string[]>(['사업성', '팀역량', '기술성', '시장성', '지식재산권', '글로벌 진출 역량']);
   const [customTabs, setCustomTabs] = useState<string[]>([]);
   const [allQuestions, setAllQuestions] = useState<Record<string, any[]>>(DEFAULT_QUESTIONS);
 
@@ -102,7 +109,7 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
         setCustomTabs(Array.from(new Set(newCustomTabs)));
 
         // 현재 기업의 점수 세팅
-        const myData = folderAnalysis.find(d => d.startup_id === selectedItem.id && d.category === activeTab);
+        const myData = folderAnalysis.find((d: { startup_id: any; category: string; }) => d.startup_id === selectedItem.id && d.category === activeTab);
         setScores(myData?.scores || {});
         setComment(myData?.comment || '');
       } else {

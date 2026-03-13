@@ -14,11 +14,12 @@ interface ResultViewProps {
 }
 
 const QUESTION_LABELS: Record<string, string> = {
-  biz_1: 'BM 고도화', biz_2: '수익성', biz_3: '매출 성장성', biz_4: '판매처 확보', biz_5: '생산 능력',
-  team_1: '대표자 경력', team_2: '팀워크', team_3: '핵심 개발인력', team_4: '경영진 역량', team_5: '전문성',
-  tech_1: '기술 완성도', tech_2: '대체 가능성', tech_3: '기술 경쟁력', tech_4: '모방 난이도', tech_5: '기술 확장성',
-  mkt_1: '시장 성장성', mkt_2: '시장 경쟁도', mkt_3: '국내 규모', mkt_4: '글로벌 규모', mkt_5: '진입 장벽',
-  fin_1: '국내 특허', fin_2: '해외 특허', fin_3: '사업 유관성', fin_4: 'IP 보호전략', fin_5: '사업화 전략'
+  biz_1: '비즈니스 확장성 (Scalability', biz_2: '수익 건전성', biz_3: '매출 성장속도', biz_4: '시장 점유 확대', biz_5: '운영 시스템화',
+  team_1: 'C-level 리더십', team_2: '중간관리 조직', team_3: '핵심인재 유지/채용', team_4: '데이터 기반 의사결정', team_5: '조직 확장 유연성',
+  tech_1: '기술적 해자(Moat)', tech_2: '시스템 안정성', tech_3: '데이터 자산화', tech_4: 'R&D 실행 속도', tech_5: '기술 부채 관리',
+  mkt_1: '시장 침투 속도', mkt_2: '고객 락인(Lock-in)', mkt_3: '진입 장벽', mkt_4: '시장 트렌드 주도권', mkt_5: '마케팅 효율성',
+  fin_1: '특허 포트폴리오의 전략성', fin_2: '특허 주체 및 권리 안정성', fin_3: '기술 사업화 수준', fin_4: 'IP 리스크 관리 체계',
+  glo_1: '글로벌 시장 적합성', glo_2: '글로벌 파트너십 확장성',  glo_3: '해외 트랙션', glo_4: '글로벌 인적 인프라', glo_5: '글로벌 규제 및 수출 체계'
 };
 
 const INVESTMENT_STAGES = [
@@ -123,14 +124,14 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
         const { data: myAnalysis } = await supabase.from('startup_analysis').select('*').eq('startup_id', startupId);
         
         if (startupInfo) {
-          const { data: folderAnalysis } = await supabase.from('startup_analysis').select('*').in('startup_id', (await supabase.from('startups').select('id').eq('parent_id', startupInfo.parent_id)).data?.map(s => s.id) || []);
+          const { data: folderAnalysis } = await supabase.from('startup_analysis').select('*').in('startup_id', (await supabase.from('startups').select('id').eq('parent_id', startupInfo.parent_id)).data?.map((s: { id: any; }) => s.id) || []);
           const avgMap: any = {};
-          folderAnalysis?.forEach(item => {
+          folderAnalysis?.forEach((item: { category: string | number; total_score: any; }) => {
             if (!avgMap[item.category]) avgMap[item.category] = { sum: 0, count: 0 };
             avgMap[item.category].sum += item.total_score;
             avgMap[item.category].count += 1;
           });
-          const combinedRadar = myAnalysis?.map(item => ({
+          const combinedRadar = myAnalysis?.map((item: { category: string | number; total_score: any; comment: any; }) => ({
             subject: item.category,
             score: item.total_score,
             avgScore: avgMap[item.category] ? Math.round((avgMap[item.category].sum / avgMap[item.category].count) * 10) / 10 : 0,

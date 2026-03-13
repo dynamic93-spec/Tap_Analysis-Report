@@ -61,12 +61,10 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
   const [customTabs, setCustomTabs] = useState<string[]>([]);
   const [allQuestions, setAllQuestions] = useState<Record<string, any[]>>(DEFAULT_QUESTIONS);
   
-  // 현재 기업이 속한 폴더 ID
   const currentFolderId = selectedItem.parent_id;
 
   useEffect(() => { loadAllData(); }, [selectedItem.id, activeTab]);
 
-  
   const loadAllData = async () => {
     if (!selectedItem?.id) return;
     try {
@@ -77,45 +75,34 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
 
       if (error) throw error;
 
-      // 핵심: 항상 기본 질문 세트에서 시작합니다.
-      const updatedQuestions = { ...DEFAULT_QUESTIONS }; 
+      // [핵심] 현재 상태(allQuestions)를 유지하면서 DB와 기본 질문을 병합
+      const updatedQuestions = { ...DEFAULT_QUESTIONS, ...allQuestions }; 
       const newCustomTabs: string[] = [];
 
       if (folderAnalysis && folderAnalysis.length > 0) {
         folderAnalysis.forEach((d: any) => {
-          // DB에 저장된 질문 세트가 있다면 해당 카테고리를 업데이트
           if (d.extra_questions && d.extra_questions.length > 0) {
             updatedQuestions[d.category] = d.extra_questions;
           }
-          
-          // 고정 탭이 아닌 새로운 탭(카테고리) 추가
           if (!fixedTabs.includes(d.category)) {
             newCustomTabs.push(d.category);
           }
         });
 
-        // ⚠️ 중요: 현재 선택된 탭의 질문이 updatedQuestions에 없는 경우 방어 로직
-        if (!updatedQuestions[activeTab]) {
-          updatedQuestions[activeTab] = DEFAULT_QUESTIONS[activeTab] || [];
-        }
-
-        setAllQuestions(updatedQuestions);
-        setCustomTabs(Array.from(new Set(newCustomTabs)));
-
-        // 현재 기업의 점수 세팅
-        const myData = folderAnalysis.find((d: { startup_id: any; category: string; }) => d.startup_id === selectedItem.id && d.category === activeTab);
+        const myData = folderAnalysis.find((d: any) => d.startup_id === selectedItem.id && d.category === activeTab);
         setScores(myData?.scores || {});
         setComment(myData?.comment || '');
-      } else {
-        // 데이터가 없는 경우 원본 데이터 유지
-        setAllQuestions(DEFAULT_QUESTIONS);
-        setCustomTabs([]);
       }
+
+      setAllQuestions(updatedQuestions);
+      setCustomTabs(Array.from(new Set(newCustomTabs)));
     } catch (err) { console.error("Load Error:", err); }
   };
 
+  // --- 카테고리(탭) 관리 로직 ---
+  
   const handleAddCategory = () => {
-    const newTabName = prompt("새로운 평가 카테고리 이름을 입력하세요 (예: 글로벌 역량)");
+    const newTabName = prompt("새로운 평가 카테고리 이름을 입력하세요.");
     if (!newTabName) return;
     if (fixedTabs.includes(newTabName) || customTabs.includes(newTabName)) {
       alert("이미 존재하는 이름입니다.");
@@ -133,6 +120,49 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
     setAllQuestions(prev => ({ ...prev, [newTabName]: initialSet }));
     setActiveTab(newTabName);
   };
+
+  const handleRenameCategory = async (oldName: string) => {
+    if (fixedTabs.includes(oldName)) return;
+    const newName = prompt("카테고리 이름을 수정합니다:", oldName);
+    if (!newName || newName === oldName) return;
+
+    try {
+      const { error } = await supabase
+        .from('startup_analysis')
+        .update({ category: newName })
+        .eq('folder_id', currentFolderId)
+        .eq('category', oldName);
+      if (error) throw error;
+
+      setCustomTabs(prev => prev.map(t => t === oldName ? newName : t));
+      setAllQuestions(prev => {
+        const next = { ...prev };
+        next[newName] = next[oldName];
+        delete next[oldName];
+        return next;
+      });
+      setActiveTab(newName);
+    } catch (err: any) { alert("수정 실패: " + err.message); }
+  };
+
+  const handleDeleteCategory = async (targetTab: string) => {
+    if (fixedTabs.includes(targetTab)) return;
+    if (!confirm(`[${targetTab}] 카테고리를 삭제하시겠습니까? 데이터가 모두 소실됩니다.`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('startup_analysis')
+        .delete()
+        .eq('folder_id', currentFolderId)
+        .eq('category', targetTab);
+      if (error) throw error;
+
+      setCustomTabs(prev => prev.filter(t => t !== targetTab));
+      setActiveTab('사업성');
+    } catch (err: any) { alert("삭제 실패: " + err.message); }
+  };
+
+  // --- 질문(Row) 관리 로직 ---
 
   const updateQuestionText = (id: string, field: 'label' | 'guide', value: string) => {
     setAllQuestions(prev => ({
@@ -154,17 +184,17 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
         .from('startup_analysis')
         .upsert({
           startup_id: selectedItem.id,
-          folder_id: currentFolderId, // 동기화 기준이 되는 폴더 ID
+          folder_id: currentFolderId,
           category: activeTab,
           scores: scores,
           total_score: Object.values(scores).reduce((a, b) => a + b, 0),
           comment: comment,
-          extra_questions: allQuestions[activeTab] || [], // 현재 질문 틀 저장
+          extra_questions: allQuestions[activeTab] || [],
           updated_at: new Date().toISOString()
         }, { onConflict: 'startup_id, category' });
 
       if (error) throw error;
-      alert(`[${activeTab}] 데이터가 저장되었습니다.\n동일 폴더 내 기업들이 이 질문 구성을 공유하게 됩니다.`);
+      alert(`[${activeTab}] 저장이 완료되었습니다.`);
       loadAllData();
     } catch (error: any) {
       alert("저장 실패: " + error.message);
@@ -179,25 +209,32 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
       {/* 상단 탭 내비게이션 */}
       <div className="flex flex-wrap mb-10 border border-slate-300 bg-white shadow-sm">
         {[...fixedTabs, ...customTabs].map((tab) => (
-          <button 
-            key={tab} 
-            onClick={() => setActiveTab(tab)} 
-            className={`px-6 py-4 text-[14px] font-bold border-r border-b border-slate-300 transition-all ${
-              activeTab === tab ? 'bg-[#232d3f] text-white shadow-inner' : 'bg-white text-slate-500 hover:bg-slate-50'
-            }`}
-          >
-            {tab}
-          </button>
+          <div key={tab} className="relative group flex items-center border-r border-slate-300">
+            <button 
+              onClick={() => setActiveTab(tab)} 
+              className={`px-6 py-4 text-[14px] font-bold transition-all ${
+                activeTab === tab ? 'bg-[#232d3f] text-white shadow-inner' : 'bg-white text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              {tab}
+            </button>
+            
+            {/* 커스텀 탭인 경우 수정/삭제 버튼 노출 */}
+            {!fixedTabs.includes(tab) && (
+              <div className="absolute top-0 right-0 flex opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 p-0.5 rounded-bl-md">
+                <button onClick={() => handleRenameCategory(tab)} className="p-1 text-blue-500 hover:scale-125" title="이름 수정">✎</button>
+                <button onClick={() => handleDeleteCategory(tab)} className="p-1 text-red-500 hover:scale-125" title="탭 삭제">✕</button>
+              </div>
+            )}
+          </div>
         ))}
-        <button onClick={handleAddCategory} className="px-8 py-4 bg-slate-100 text-slate-900 font-black text-xl hover:bg-blue-600 hover:text-white transition-all border-b border-slate-300">+</button>
+        <button onClick={handleAddCategory} className="px-8 py-4 bg-slate-100 text-slate-900 font-black text-xl hover:bg-blue-600 hover:text-white transition-all">+</button>
       </div>
 
       {/* 진단 테이블 섹션 */}
-      <div className="bg-white border border-slate-300 overflow-hidden shadow-sm">
-        <div className="p-5 bg-slate-50 border-b border-slate-300 flex justify-between items-end">
-          <div>
-            <h3 className="font-black text-xl text-slate-800 tracking-tight">[{activeTab}] 상세 진단</h3>
-          </div>
+      <div className="bg-white border border-slate-300 overflow-hidden shadow-sm rounded-sm">
+        <div className="p-5 bg-slate-50 border-b border-slate-300 flex justify-between items-center">
+          <h3 className="font-black text-xl text-slate-800 tracking-tight">[{activeTab}] 상세 진단</h3>
         </div>
         
         <table className="w-full border-collapse">
@@ -212,15 +249,13 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
             {currentQuestions.map((q) => (
               <tr key={q.id} className="border-b border-slate-300 last:border-b-0 hover:bg-slate-50/30 transition-colors">
                 <td className="p-5 font-bold border-r border-slate-300 bg-slate-50/20 text-slate-800">
-                  {q.isExtra ? (
-                    <input 
-                      type="text" 
-                      value={q.label} 
-                      onChange={(e) => updateQuestionText(q.id, 'label', e.target.value)} 
-                      placeholder="질문 내용을 입력하세요" 
-                      className="w-full p-2 border-b border-slate-200 font-bold bg-transparent outline-none focus:border-blue-500 transition-all placeholder:text-slate-300" 
-                    />
-                  ) : q.label}
+                  <input 
+                    type="text" 
+                    value={q.label} 
+                    onChange={(e) => updateQuestionText(q.id, 'label', e.target.value)} 
+                    placeholder="질문 내용을 입력하세요" 
+                    className="w-full p-2 border-b border-transparent font-bold bg-transparent outline-none focus:border-blue-500 focus:bg-white transition-all placeholder:text-slate-300" 
+                  />
                 </td>
                 <td className="p-4 text-center border-r border-slate-300">
                   <div className="flex flex-col items-center gap-1">
@@ -239,7 +274,7 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
                   <textarea 
                     value={q.guide} 
                     onChange={(e) => updateQuestionText(q.id, 'guide', e.target.value)} 
-                    placeholder="해당 질문에 대한 평가 기준이나 가이드를 입력하세요. 저장 시 폴더 전체에 공유됩니다." 
+                    placeholder="평가 기준을 입력하세요." 
                     className="w-full min-h-[110px] p-4 border border-slate-100 text-[13px] outline-none focus:border-blue-300 bg-white/50 rounded-lg resize-none leading-relaxed shadow-inner" 
                   />
                 </td>
@@ -250,7 +285,7 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
       </div>
 
       {/* 종합 의견 섹션 */}
-      <div className="mt-10 bg-white border border-slate-300 flex min-h-[180px] shadow-sm rounded-sm overflow-hidden">
+      <div className="mt-10 bg-white border b`order-slate-300 flex min-h-[180px] shadow-sm rounded-sm overflow-hidden">
         <div className="w-[160px] bg-slate-100 border-r border-slate-300 p-6 flex flex-col items-center justify-center gap-2">
           <span className="text-2xl">✍️</span>
           <span className="font-black text-slate-500 text-center text-xs uppercase tracking-widest leading-tight">세부<br/>의견</span>
@@ -259,7 +294,7 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
           <textarea 
             value={comment} 
             onChange={(e) => setComment(e.target.value)} 
-            placeholder={`[${activeTab}] 카테고리에 대한 종합적인 검토 의견을 입력하세요. 이 내용은 해당 기업 리포트에만 반영됩니다.`} 
+            placeholder={`[${activeTab}] 카테고리에 대한 종합적인 검토 의견을 입력하세요.`} 
             className="w-full h-full p-8 outline-none text-[15px] resize-none leading-relaxed placeholder:text-slate-300 font-medium" 
           />
         </div>
@@ -267,7 +302,6 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
 
       {/* 하단 버튼 제어 */}
       <div className="mt-14 flex justify-end items-center gap-6">
-        
         <button 
           onClick={handleSave} 
           disabled={isSaving} 

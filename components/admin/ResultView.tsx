@@ -13,13 +13,14 @@ interface ResultViewProps {
   refreshTrigger?: number;
 }
 
+// 시스템 기본 고정 질문 라벨 매핑 (AnalysisSystem의 DEFAULT_QUESTIONS와 매칭)
 const QUESTION_LABELS: Record<string, string> = {
-  biz_1: '비즈니스 확장성 (Scalability', biz_2: '수익 건전성', biz_3: '매출 성장속도', biz_4: '시장 점유 확대', biz_5: '운영 시스템화',
+  biz_1: '비즈니스 확장성 (Scalability)', biz_2: '수익 건전성', biz_3: '매출 성장속도', biz_4: '시장 점유 확대', biz_5: '운영 시스템화',
   team_1: 'C-level 리더십', team_2: '중간관리 조직', team_3: '핵심인재 유지/채용', team_4: '데이터 기반 의사결정', team_5: '조직 확장 유연성',
   tech_1: '기술적 해자(Moat)', tech_2: '시스템 안정성', tech_3: '데이터 자산화', tech_4: 'R&D 실행 속도', tech_5: '기술 부채 관리',
   mkt_1: '시장 침투 속도', mkt_2: '고객 락인(Lock-in)', mkt_3: '진입 장벽', mkt_4: '시장 트렌드 주도권', mkt_5: '마케팅 효율성',
-  fin_1: '특허 포트폴리오의 전략성', fin_2: '특허 주체 및 권리 안정성', fin_3: '기술 사업화 수준', fin_4: 'IP 리스크 관리 체계',
-  glo_1: '글로벌 시장 적합성', glo_2: '글로벌 파트너십 확장성',  glo_3: '해외 트랙션', glo_4: '글로벌 인적 인프라', glo_5: '글로벌 규제 및 수출 체계'
+  fin_1: '특허 포트폴리오의 전략성', fin_2: '특허 주체 및 권리 안정성', fin_3: '기술 사업화 수준', fin_4: 'IP 리스크 관리 체계', fin_5: '기술사업화 전략',
+  glo_1: '글로벌 시장 적합성', glo_2: '글로벌 파트너십 확장성', glo_3: '해외 트랙션', glo_4: '글로벌 인적 인프라', glo_5: '글로벌 규제 및 수출 체계'
 };
 
 const INVESTMENT_STAGES = [
@@ -39,7 +40,6 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
   const [investments, setInvestments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-
   const [investComment, setInvestComment] = useState("");
   const [futurePlans, setFuturePlans] = useState([
     { title: "주제명 1", content: "" },
@@ -47,7 +47,6 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
     { title: "주제명 3", content: "" }
   ]);
 
-  // [중요] 독립된 저장 버튼용 함수
   const handleDataSave = async () => {
     try {
       const { error } = await supabase.from('startup_report_details').upsert({
@@ -71,7 +70,6 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
     documentTitle: `${data?.company_name || '기업진단보고서'}`,
   });
 
-  
   const handlePlanChange = (index: number, field: 'title' | 'content', value: string) => {
     const newPlans = [...futurePlans];
     newPlans[index][field] = value;
@@ -135,7 +133,7 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
             subject: item.category,
             score: item.total_score,
             avgScore: avgMap[item.category] ? Math.round((avgMap[item.category].sum / avgMap[item.category].count) * 10) / 10 : 0,
-            db_comment: item.comment // comments 필드가 아닌 comment 필드를 사용하는지 확인 필요
+            db_comment: item.comment 
           })) || [];
 
           setData(startupInfo);
@@ -155,15 +153,13 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
   return (
     <div className="flex flex-col items-center py-10 bg-slate-100 min-h-screen font-sans text-slate-900">
       
-      {/* 상단 컨트롤 바: 저장 버튼과 인쇄 버튼 분리 */}
+      {/* 상단 컨트롤 바 */}
       <div className="w-[794px] flex justify-between items-center bg-white/90 backdrop-blur-sm p-5 rounded-2xl shadow-xl no-print border border-slate-200 mb-8">
         <div><h2 className="text-xl font-black italic uppercase tracking-tighter text-black-600">기업진단보고서 미리보기</h2></div>
         <div className="flex gap-3">
-          {/* [추가] 독립된 저장 버튼 */}
           <button onClick={handleDataSave} className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-md active:scale-95 flex items-center gap-2">
             <span>💾</span> 데이터 저장
           </button>
-          
           <button 
             onClick={() => handlePrint()} 
             className="bg-blue-600 text-white px-8 py-3 rounded-xl font-black text-sm uppercase tracking-widest shadow-lg active:scale-95 flex items-center gap-2 hover:bg-blue-700 transition-colors"
@@ -195,8 +191,6 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
 
         {/* ================= 1. 리포트 본문 ================= */}
         <div className="report-content-page">
-
-          
           <div id="first-section-label" className="section-label">□ 기업 기본 정보</div>
           <table className="info-table">
             <tbody>
@@ -296,19 +290,18 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
                 );
               })}
             </div>
-            </div>
+          </div>
 
-            <div className="section-label">□ 투자 로드맵</div>
-            <div className="invest-opinion-box mt-2">
-              <textarea 
-                className="invest-opinion-textarea"
-                value={investComment}
-                onChange={(e) => setInvestComment(e.target.value)}
-                placeholder="해당 기업의 투자 현황 및 라운드에 대한 종합 의견을 입력하세요"
-                rows={1}
-              />
-            </div>
-        
+          <div className="section-label">□ 투자 로드맵</div>
+          <div className="invest-opinion-box mt-2">
+            <textarea 
+              className="invest-opinion-textarea"
+              value={investComment}
+              onChange={(e) => setInvestComment(e.target.value)}
+              placeholder="해당 기업의 투자 현황 및 라운드에 대한 종합 의견을 입력하세요"
+              rows={1}
+            />
+          </div>
 
           <div className="section-label">□ 역량 진단 통합 분석</div>
           <div className="radar-layout">
@@ -339,27 +332,49 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
             </div>
           </div>
 
-          {/* ================= 2단 레이아웃 (세부 진단 6:4 향후 전략) ================= */}
+          {/* ================= 2단 레이아웃 (세부 진단 및 향후 전략) ================= */}
           <div className="dual-layout-grid">
             <div className="left-section">
               <div className="section-label-minimal">□ 항목별 세부 진단 결과</div>
               <div className="analysis-grid">
-                {detailedScores.slice(0, 6).map((cat, idx) => (
-                  <div key={idx} className="analysis-card">
-                    <div className="analysis-card-header">
-                      <span>{cat.category}</span>
-                      <span className="header-score">{cat.total_score} / 50</span>
+                {/* [수정 포인트 1] slice(0, 6) 제거하여 모든 항목 표시 */}
+                {detailedScores?.map((cat, idx) => {
+                  
+                  // [수정 포인트 2] 해당 카테고리에 저장된 동적 질문 라벨 맵 생성
+                  const currentLabels: Record<string, string> = {};
+                  if (cat.extra_questions && Array.isArray(cat.extra_questions)) {
+                    cat.extra_questions.forEach((q: any) => {
+                      if (q.id && q.label) currentLabels[q.id] = q.label;
+                    });
+                  }
+
+                  return (
+                    <div key={idx} className="analysis-card">
+                      <div className="analysis-card-header">
+                        <span className="truncate">{cat.category}</span>
+                        <span className="header-score">{cat.total_score} / 50</span>
+                      </div>
+                      <div className="analysis-card-body">
+                        {cat.scores && Object.entries(cat.scores).map(([k, v]: any) => {
+                          // [수정 포인트 3] 라벨 우선순위: 동적 질문 -> 고정 질문 -> 기본값
+                          const label = currentLabels[k] || QUESTION_LABELS[k] || `세부 항목 (${k.split('_').pop()})`;
+
+                          return (
+                            <div key={k} className="score-row">
+                              <div className="score-info">
+                                <span className="truncate mr-1" title={label}>{label}</span>
+                                <b>{v}</b>
+                              </div>
+                              <div className="score-bar-bg">
+                                <div className="score-bar-fill" style={{ width: `${(Number(v)/10)*100}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="analysis-card-body">
-                      {Object.entries(cat.scores || {}).map(([k, v]: any) => (
-                        <div key={k} className="score-row">
-                          <div className="score-info"><span>{QUESTION_LABELS[k] || k}</span><b>{v}</b></div>
-                          <div className="score-bar-bg"><div className="score-bar-fill" style={{ width: `${(Number(v)/10)*100}%` }} /></div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -375,8 +390,6 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
               </div>
             </div>
           </div>
-
-
         </div>
       </div>
 
@@ -397,31 +410,13 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
         .cover-content { position: relative; z-index: 1; text-align: center; width: 100%; }
         .cover-title { font-size: 42px; font-weight: 900; line-height: 1.3; color: #1e293b; margin-bottom: 60px; }
         .cover-info-box { width: 400px; border-top: 3px solid #1e293b; padding-top: 40px; margin: 80px auto 0; text-align: center; }
-        .cover-footer { 
-          position: absolute; 
-          bottom: 80px; 
-          width: 100%; 
-          display: flex; 
-          flex-direction: column; 
-          align-items: center; 
-          justify-content: center;
-        }
-        .cover-logo-wrapper { margin-bottom: 15px; }
-        .cover-footer-logo { 
-          height: 150px; /* 높이는 적절히 조정 가능 */
-          width: 400px; 
-          object-fit: contain; 
-        }
+        .cover-footer { position: absolute; bottom: 80px; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .cover-footer-logo { height: 150px; width: 400px; object-fit: contain; }
 
         /* 본문 섹션 */
         .report-content-page { width: 100%; padding: 0 50px 40px 50px; min-height: 1123px; }
         #first-section-label { margin-top: 20px !important; }
-
-        .section-label { 
-          font-size: 15px; font-weight: 900; color: #1e293b; 
-          border-bottom: 1.5px solid #1e293b; padding-bottom: 4px; 
-          margin-top: 40px; margin-bottom: 15px; break-after: avoid; 
-        }
+        .section-label { font-size: 15px; font-weight: 900; color: #1e293b; border-bottom: 1.5px solid #1e293b; padding-bottom: 4px; margin-top: 40px; margin-bottom: 15px; break-after: avoid; }
 
         .info-table, .invest-table, .radar-score-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         .info-table th { background: #f8fafc; border: 1px solid #e2e8f0; padding: 6px; width: 90px; text-align: center; color: #475569; font-size: 12px; }
@@ -437,38 +432,14 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
         .chart-wrapper { width: 100%; height: 210px; }
         .chart-inner-title { text-align: center; font-size: 11px; font-weight: 800; color: #64748b; margin-bottom: 5px; }
 
-        /* 투자 시각화 */
-        .investment-unified-box {
-          background: #f8fafc; /* 연한 배경색으로 전체를 묶어줌 */
-          border: 1px solid #e2e8f0;
-          border-radius: 12px;
-          padding: 15px;
-        }
-
-        .visual-container { display: flex; gap: 4px; align-items: flex-start; margin : 0px; }
+        .investment-unified-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; }
+        .visual-container { display: flex; gap: 4px; align-items: flex-start; }
         .stage-item { flex: 1; display: flex; flex-direction: column; align-items: center; }
-        .arrow-box { 
-          width: 100%; height: 35px; display: flex; justify-content: center; align-items: center; position: relative;
-          clip-path: polygon(0% 0%, 90% 0%, 100% 50%, 90% 100%, 0% 100%, 10% 50%); 
-          margin-bottom: 8px;
-        }
+        .arrow-box { width: 100%; height: 35px; display: flex; justify-content: center; align-items: center; position: relative; clip-path: polygon(0% 0%, 90% 0%, 100% 50%, 90% 100%, 0% 100%, 10% 50%); margin-bottom: 8px; }
         .stage-item:first-child .arrow-box { clip-path: polygon(0% 0%, 90% 0%, 100% 50%, 90% 100%, 0% 100%); }
         .stage-label { font-weight: 900; font-size: 9px; letter-spacing: -0.5px; }
         .stage-investors-list { width: 100%; font-size: 8.5px; padding: 0 5px; color: #475569; min-height: 40px; }
         .investor-name-visual { font-weight: 700; color: #1e293b; line-height: 1.3; }
-
-        /* 내부 의견 박스 스타일 */
-        .opinion-box-inner {
-          border-top: 1px solid #e2e8f0;
-          padding-top: 10px;
-          margin-top: 5px;
-        }
-        .invest-opinion-textarea-simple {
-          width: 100%; border: none; background: transparent; resize: none; outline: none;
-          font-size: 11px; color: #334155; line-height: 1.6; font-style: italic;
-        }
-
-        @keyframes pulse { 0% {opacity: 1} 50% {opacity: 0.4} 100% {opacity: 1} }
 
         .radar-layout { display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid #f1f5f9; border-radius: 15px; break-inside: avoid; }
         .radar-visual { width: 280px; height: 260px; }
@@ -476,76 +447,37 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
         .radar-score-table th { background: #f8fafc; border-bottom: 1px solid #e2e8f0; padding: 8px; font-weight: 800; }
         .radar-score-table td { border-bottom: 1px solid #f1f5f9; padding: 7px; vertical-align: top; }
 
-        /* 2단 그리드 (6:4 비율) */
         .dual-layout-grid { display: grid; grid-template-columns: 6fr 4fr; gap: 20px; flex-grow: 1; align-items: stretch; margin-top: 30px; }
         .section-label-minimal { font-size: 14px; font-weight: 900; color: #1e293b; border-bottom: 2px solid #1e293b; padding-bottom: 6px; margin-bottom: 10px; }
 
-        .analysis-grid { display: grid; grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(3, 1fr); gap: 10px; }
+        .analysis-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
         .analysis-card { border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #fff; display: flex; flex-direction: column; }
         .analysis-card-body { padding: 8px 8px; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }
-        
-        .analysis-card-header { 
-            background: #2563eb; 
-            color: white; 
-            font-size: 10px; 
-            font-weight: 900; 
-            padding: 6px 10px; 
-            display: flex; 
-            justify-content: space-between; /* 카테고리는 왼쪽, 점수는 오른쪽 끝으로 밀어냄 */
-            align-items: center;
-          }
-
-          .header-score { 
-            font-size: 10px;   
-            color: #d1d1d1;    
-            font-weight: 900; 
-            margin-left: auto;  
-          }
+        .analysis-card-header { background: #2563eb; color: white; font-size: 10px; font-weight: 900; padding: 6px 10px; display: flex; justify-content: space-between; align-items: center; }
+        .header-score { font-size: 10px; color: #d1d1d1; font-weight: 900; margin-left: auto; }
 
         .score-row { margin-bottom: 4px; }
         .score-info { display: flex; justify-content: space-between; font-size: 8.5px; font-weight: 700; color: #475569; margin-bottom: 2px; }
         .score-bar-bg { width: 100%; height: 4px; background: #f1f5f9; border-radius: 2px; }
         .score-bar-fill { height: 100%; background: #3b82f6; }
-        .analysis-card-footer { font-size: 9px; font-weight: 900; text-align: right; color: #1e293b; margin-top: 6px; border-top: 1px solid #f1f5f9; padding-top: 4px; }
 
         .future-input-container { display: flex; flex-direction: column; gap: 10px; }
         .future-input-group { border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; height: 150px; display: flex; flex-direction: column; }
         .future-title-input { font-size: 13px; font-weight: 900; color: #2563eb; border: none; border-bottom: 1px solid #f1f5f9; background: #f8fafc; padding: 10px; }
         .future-content-textarea { width: 100%; flex-grow: 1; border: none; background: transparent; resize: none; outline: none; font-size: 9px; color: #334155; padding: 10px 12px; }
 
-        .invest-opinion-textarea { 
-          width: 100%; 
-          height: 60px; 
-          display: flex; 
-          flex-grow: 1; 
-          border: 1px solid #66768b; /* 영역 구분을 위한 얇은 테두리 */
-          background: #f1f5f9; /* 연한 회색 배경 */
-          border-radius: 3px; 
-          resize: none; 
-          outline: none; 
-          font-size: 11px; 
-          padding: 8px; 
-          margin: 0 !important; 
-        }
-
+        .invest-opinion-textarea { width: 100%; height: 60px; border: 1px solid #66768b; background: #f1f5f9; border-radius: 3px; resize: none; outline: none; font-size: 11px; padding: 8px; }
 
         @media print {
           @page { size: A4; margin: 10mm !important; }
           body { background: white !important; margin: 0 !important; padding: 0 !important; }
           .no-print { display: none !important; }
           .report-paper-container { box-shadow: none !important; border: none !important; width: 100% !important; margin: 0 !important; }
-          .report-cover-page { height: 100vh !important; margin: 0 !important; padding: 0 !important; display: flex !important; justify-content: center !important; break-after: page !important; }
+          .report-cover-page { height: 100vh !important; break-after: page !important; }
           .report-content-page { padding: 0 !important; }
-          .section-label { margin-top: 10px !important; }
-          .invest-opinion-textarea {
-              background: #ffffff !important;
-              border: 1px solid #cbd5e1 !important;
-            }
-          #first-section-label { margin-top: 0 !important; }
+          .invest-opinion-textarea { background: #ffffff !important; border: 1px solid #cbd5e1 !important; }
           .future-input-group { border: 1.5px solid #cbd5e1 !important; }
-          tr, .analysis-card, .future-input-group, .radar-layout, .chart-container, .section-label, .investment-visual-section, .dual-layout-grid { 
-            break-inside: avoid !important; page-break-inside: avoid !important; 
-          }
+          tr, .analysis-card, .future-input-group, .radar-layout, .chart-container, .section-label, .dual-layout-grid { break-inside: avoid !important; }
         }
       `}</style>
     </div>

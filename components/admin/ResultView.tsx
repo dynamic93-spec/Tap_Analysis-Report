@@ -40,6 +40,7 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
   const [investments, setInvestments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // 투자 로드맵 및 향후 전략 상태
   const [investComment, setInvestComment] = useState("");
   const [futurePlans, setFuturePlans] = useState([
     { title: "주제명 1", content: "" },
@@ -47,6 +48,7 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
     { title: "주제명 3", content: "" }
   ]);
 
+  // [중요] 데이터 저장 함수
   const handleDataSave = async () => {
     try {
       const { error } = await supabase.from('startup_report_details').upsert({
@@ -59,10 +61,14 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
         plan_title_3: futurePlans[2].title,
         plan_content_3: futurePlans[2].content,
         updated_at: new Date()
-      });
+      }, { onConflict: 'startup_id' }); // startup_id가 같으면 덮어쓰기
+
       if (error) throw error;
       alert("데이터가 성공적으로 저장되었습니다.");
-    } catch (e) { console.error(e); alert("저장 실패"); }
+    } catch (e) { 
+      console.error(e); 
+      alert("저장 실패"); 
+    }
   };
 
   const handlePrint = useReactToPrint({
@@ -111,16 +117,34 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
     return investments[investments.length - 1];
   }, [investments]);
 
+  // 데이터 로드 useEffect
   useEffect(() => {
     const fetchData = async () => {
       if (!startupId || startupId === 'undefined') return;
       setLoading(true);
       try {
+        // 1. 기본 정보 호출
         const { data: startupInfo } = await supabase.from('startups').select('*').eq('id', startupId).maybeSingle();
-        const { data: investData } = await supabase.from('startup_investments').select('period, investor, round, amount, pre_share, post_share').eq('startup_id', startupId).order('period', { ascending: true });
+        const { data: investData } = await supabase.from('startup_investments').select('*').eq('startup_id', startupId).order('period', { ascending: true });
         const { data: stats } = await supabase.from('startup_financials').select('*').eq('startup_id', startupId).order('year');
         const { data: myAnalysis } = await supabase.from('startup_analysis').select('*').eq('startup_id', startupId);
         
+        // [중요] 2. 저장된 리포트 상세(투자 로드맵/향후 전략) 호출
+        const { data: reportDetails } = await supabase
+          .from('startup_report_details')
+          .select('*')
+          .eq('startup_id', startupId)
+          .maybeSingle();
+
+        if (reportDetails) {
+          setInvestComment(reportDetails.invest_comment || "");
+          setFuturePlans([
+            { title: reportDetails.plan_title_1 || "주제명 1", content: reportDetails.plan_content_1 || "" },
+            { title: reportDetails.plan_title_2 || "주제명 2", content: reportDetails.plan_content_2 || "" },
+            { title: reportDetails.plan_title_3 || "주제명 3", content: reportDetails.plan_content_3 || "" }
+          ]);
+        }
+
         if (startupInfo) {
           const { data: folderAnalysis } = await supabase.from('startup_analysis').select('*').in('startup_id', (await supabase.from('startups').select('id').eq('parent_id', startupInfo.parent_id)).data?.map((s: { id: any; }) => s.id) || []);
           const avgMap: any = {};

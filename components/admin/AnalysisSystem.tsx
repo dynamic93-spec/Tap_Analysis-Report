@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { StartupDetail } from './types';
 
 interface AnalysisSystemProps {
   selectedItem: any; 
@@ -10,9 +9,6 @@ interface AnalysisSystemProps {
   onSave: (data: any) => Promise<any>;
 }
 
-
-
-// 1. 시스템 기본 고정 질문 세트
 const DEFAULT_QUESTIONS: Record<string, any[]> = {
   '사업성': [
     { id: 'biz_1', label: 'BM 고도화 수준', guide: '① BM 개발 중\n② BM 개발 완료 및 테스트 중\n③ 시장검증단계를 통해 가능성 확인\n④ BM을 통해 시장확보 및 고객 창출 중임\n⑤ BM을 통해 적정한 규모의 매출 발생 중임' },
@@ -32,7 +28,7 @@ const DEFAULT_QUESTIONS: Record<string, any[]> = {
     { id: 'tech_1', label: '기술개발 완성도', guide: '① 아이디어 단계에 있는 기술\n② 연구개발 진행 단계에 있는 기술\n③ 연구개발 완료 단계에 있는 기술\n④ 상용화를 위한 시제품 제작단계에 있는 기술\n⑤ 상용화 및 양산기준을 충족시킬 수 있는 입증된 기술' },
     { id: 'tech_2', label: '유사 및 대체 기술 출현 가능성', guide: '① 적용 가능한 대체기술이 다수 존재함\n② 적용 가능한 대체기술이 일부(3개 이하) 존재함\n③ 일부 사항이 보완되면 적용 가능한 대체기술이 존재함\n④ 수명 기간 내에 대체기술의 출현 가능성이 있음\n⑤ 평가 대상 기술의 수명 기간 내에는 대체기술의 출현 가능성이 없음' },
     { id: 'tech_3', label: '기술의 경쟁력', guide: '① 경쟁기술 대비 기능 및 성능이 미흡함\n② 경쟁기술 대비 기능 및 성능이 다소 미흡하나 보완 가능\n③ 경쟁기술 대비 기능 및 성능이 유사하거나 다소 우위에 있음\n④ 경쟁기술 대비 기능 및 성능이 우수함\n⑤ 경쟁기술이 없으며, 기능 및 성능이 매우 뛰어남' },
-    { id: 'tech_4', label: '모방 난이도', guide: '"① 모방이 용이하며, 이로 인해 사업자체의 존립도 영향을 받음\n② 모방이 비교적 용이하며, 이로 인해 사업의 이익감소가 우려 됨\n③ 모방이 쉽지는 않으며, 모방을 통해 이익이 크게 침해받지는 않음\n④ 모방이 어렵고, 또한 모방여부를 쉽게 식별할 수 있음\n⑤ 고도의 기술축적이 필요하여 모방이 거의 불가능' },
+    { id: 'tech_4', label: '모방 난이도', guide: '① 모방이 용이하며, 이로 인해 사업자체의 존립도 영향을 받음\n② 모방이 비교적 용이하며, 이로 인해 사업의 이익감소가 우려 됨\n③ 모방이 쉽지는 않으며, 모방을 통해 이익이 크게 침해받지는 않음\n④ 모방이 어렵고, 또한 모방여부를 쉽게 식별할 수 있음\n⑤ 고도의 기술축적이 필요하여 모방이 거의 불가능' },
     { id: 'tech_5', label: '기술의 확장성', guide: '① 확장 가능성이 없음\n② 일부 기술에 대한 보완이 이루어진다면, 확장이 가능함\n③ 단일 기술분야, 단일 제품군 내에서 복수의 제품으로 확장이 가능함\n④ 단일 기술분야에서 복수의 제품군으로 확장이 가능함\n⑤ 해당 산업 외에도 복수의 기술 분야로 확장이 가능함' }
   ],
   '시장성': [
@@ -75,16 +71,17 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
 
       if (error) throw error;
 
-      // [핵심] 현재 상태(allQuestions)를 유지하면서 DB와 기본 질문을 병합
-      const updatedQuestions = { ...DEFAULT_QUESTIONS, ...allQuestions }; 
-      const newCustomTabs: string[] = [];
+      let updatedQuestions = { ...DEFAULT_QUESTIONS }; 
+      let newCustomTabs: string[] = [];
 
       if (folderAnalysis && folderAnalysis.length > 0) {
+        // [수정] 폴더 내의 어떤 기업이든 가장 최근에 저장된 질문지(extra_questions)를 찾아서 적용
+        // 이렇게 해야 폴더 공통 질문지가 유지됩니다.
         folderAnalysis.forEach((d: any) => {
           if (d.extra_questions && d.extra_questions.length > 0) {
             updatedQuestions[d.category] = d.extra_questions;
           }
-          if (!fixedTabs.includes(d.category)) {
+          if (!fixedTabs.includes(d.category) && !newCustomTabs.includes(d.category)) {
             newCustomTabs.push(d.category);
           }
         });
@@ -92,15 +89,16 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
         const myData = folderAnalysis.find((d: any) => d.startup_id === selectedItem.id && d.category === activeTab);
         setScores(myData?.scores || {});
         setComment(myData?.comment || '');
+      } else {
+        setScores({});
+        setComment('');
       }
 
       setAllQuestions(updatedQuestions);
-      setCustomTabs(Array.from(new Set(newCustomTabs)));
+      setCustomTabs(newCustomTabs);
     } catch (err) { console.error("Load Error:", err); }
   };
 
-  // --- 카테고리(탭) 관리 로직 ---
-  
   const handleAddCategory = () => {
     const newTabName = prompt("새로운 평가 카테고리 이름을 입력하세요.");
     if (!newTabName) return;
@@ -108,15 +106,10 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
       alert("이미 존재하는 이름입니다.");
       return;
     }
-
     setCustomTabs(prev => [...prev, newTabName]);
     const initialSet = [1, 2, 3, 4, 5].map(num => ({
-      id: `plus_${Date.now()}_${num}`, 
-      label: '', 
-      guide: '', 
-      isExtra: true
+      id: `plus_${Date.now()}_${num}`, label: '', guide: '', isExtra: true
     }));
-
     setAllQuestions(prev => ({ ...prev, [newTabName]: initialSet }));
     setActiveTab(newTabName);
   };
@@ -125,44 +118,24 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
     if (fixedTabs.includes(oldName)) return;
     const newName = prompt("카테고리 이름을 수정합니다:", oldName);
     if (!newName || newName === oldName) return;
-
     try {
-      const { error } = await supabase
-        .from('startup_analysis')
-        .update({ category: newName })
-        .eq('folder_id', currentFolderId)
-        .eq('category', oldName);
+      const { error } = await supabase.from('startup_analysis').update({ category: newName }).eq('folder_id', currentFolderId).eq('category', oldName);
       if (error) throw error;
-
       setCustomTabs(prev => prev.map(t => t === oldName ? newName : t));
-      setAllQuestions(prev => {
-        const next = { ...prev };
-        next[newName] = next[oldName];
-        delete next[oldName];
-        return next;
-      });
       setActiveTab(newName);
     } catch (err: any) { alert("수정 실패: " + err.message); }
   };
 
   const handleDeleteCategory = async (targetTab: string) => {
     if (fixedTabs.includes(targetTab)) return;
-    if (!confirm(`[${targetTab}] 카테고리를 삭제하시겠습니까? 데이터가 모두 소실됩니다.`)) return;
-
+    if (!confirm(`[${targetTab}] 카테고리를 삭제하시겠습니까?`)) return;
     try {
-      const { error } = await supabase
-        .from('startup_analysis')
-        .delete()
-        .eq('folder_id', currentFolderId)
-        .eq('category', targetTab);
+      const { error } = await supabase.from('startup_analysis').delete().eq('folder_id', currentFolderId).eq('category', targetTab);
       if (error) throw error;
-
       setCustomTabs(prev => prev.filter(t => t !== targetTab));
       setActiveTab('사업성');
     } catch (err: any) { alert("삭제 실패: " + err.message); }
   };
-
-  // --- 질문(Row) 관리 로직 ---
 
   const updateQuestionText = (id: string, field: 'label' | 'guide', value: string) => {
     setAllQuestions(prev => ({
@@ -176,54 +149,64 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
     setScores(prev => ({ ...prev, [id]: num }));
   };
 
+  // [수정] 가장 중요한 저장 로직: 폴더 전체에 질문지 동기화 처리 포함
   const handleSave = async () => {
-    if (!selectedItem) return;
+    if (!selectedItem?.id) return;
     setIsSaving(true);
+    
     try {
-      const { error } = await supabase
+      // 1. 현재 작성 중인 질문지(extra_questions)
+      const currentQuestions = allQuestions[activeTab] || [];
+      
+      // 2. 현재 선택된 기업의 데이터 저장 (Upsert)
+      const { error: mySaveError } = await supabase
         .from('startup_analysis')
         .upsert({
           startup_id: selectedItem.id,
           folder_id: currentFolderId,
           category: activeTab,
           scores: scores,
-          total_score: Object.values(scores).reduce((a, b) => a + b, 0),
+          total_score: Object.values(scores).reduce((a, b) => a + (Number(b) || 0), 0),
           comment: comment,
-          extra_questions: allQuestions[activeTab] || [],
+          extra_questions: currentQuestions,
           updated_at: new Date().toISOString()
         }, { onConflict: 'startup_id, category' });
 
-      if (error) throw error;
+      if (mySaveError) throw mySaveError;
+
+      // 3. [동기화 핵심] 같은 폴더 내 다른 기업들에게도 질문지 텍스트(label, guide) 전파
+      // 단, 점수(scores)는 건드리지 않고 질문지 메타데이터만 업데이트합니다.
+      const { error: syncError } = await supabase
+        .from('startup_analysis')
+        .update({ extra_questions: currentQuestions })
+        .eq('folder_id', currentFolderId)
+        .eq('category', activeTab);
+
+      if (syncError) console.error("Sync Warning:", syncError);
+
       alert(`[${activeTab}] 저장이 완료되었습니다.`);
-      loadAllData();
+      await loadAllData();
+      
     } catch (error: any) {
+      console.error("Save Error:", error);
       alert("저장 실패: " + error.message);
-    } finally { setIsSaving(false); }
+    } finally { 
+      setIsSaving(false); 
+    }
   };
 
-  const currentQuestions = allQuestions[activeTab] || [];
-
   return (
-    <div className="max-w-5xl mx-auto pb-20 font-sans text-slate-700 animate-in fade-in duration-500">
-      
-      {/* 상단 탭 내비게이션 */}
+    <div className="max-w-5xl mx-auto pb-20 font-sans text-slate-700">
+      {/* 탭/테이블 UI 코드는 이전과 동일하므로 유효함 */}
+      {/* (중략 - UI 렌더링 부분은 로직 수정이 없으므로 그대로 사용) */}
       <div className="flex flex-wrap mb-10 border border-slate-300 bg-white shadow-sm">
         {[...fixedTabs, ...customTabs].map((tab) => (
           <div key={tab} className="relative group flex items-center border-r border-slate-300">
-            <button 
-              onClick={() => setActiveTab(tab)} 
-              className={`px-6 py-4 text-[14px] font-bold transition-all ${
-                activeTab === tab ? 'bg-[#232d3f] text-white shadow-inner' : 'bg-white text-slate-500 hover:bg-slate-50'
-              }`}
-            >
-              {tab}
-            </button>
-            
-            {/* 커스텀 탭인 경우 수정/삭제 버튼 노출 */}
+            <button onClick={() => setActiveTab(tab)} className={`px-6 py-4 text-[14px] font-bold transition-all ${activeTab === tab ? 'bg-[#232d3f] text-white shadow-inner' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>{tab}</button>
             {!fixedTabs.includes(tab) && (
               <div className="absolute top-0 right-0 flex opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 p-0.5 rounded-bl-md">
-                <button onClick={() => handleRenameCategory(tab)} className="p-1 text-blue-500 hover:scale-125" title="이름 수정">✎</button>
-                <button onClick={() => handleDeleteCategory(tab)} className="p-1 text-red-500 hover:scale-125" title="탭 삭제">✕</button>
+                <button onClick={() => handleRenameCategory(tab)} className="p-1 text-blue-500 hover:scale-125">✎</button>
+                <button onClick={() => handleDeleteCategory(tab)} className="p-1 text-red-500 hover:scale-125">✕</button>
               </div>
             )}
           </div>
@@ -231,84 +214,29 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
         <button onClick={handleAddCategory} className="px-8 py-4 bg-slate-100 text-slate-900 font-black text-xl hover:bg-blue-600 hover:text-white transition-all">+</button>
       </div>
 
-      {/* 진단 테이블 섹션 */}
-      <div className="bg-white border border-slate-300 overflow-hidden shadow-sm rounded-sm">
-        <div className="p-5 bg-slate-50 border-b border-slate-300 flex justify-between items-center">
-          <h3 className="font-black text-xl text-slate-800 tracking-tight">[{activeTab}] 상세 진단</h3>
-        </div>
-        
+      <div className="bg-white border border-slate-300 shadow-sm rounded-sm">
+        <div className="p-5 bg-slate-50 border-b border-slate-300 flex justify-between items-center"><h3 className="font-black text-xl text-slate-800 tracking-tight">[{activeTab}] 상세 진단</h3></div>
         <table className="w-full border-collapse">
-          <thead>
-            <tr className="bg-[#f8fafc] text-slate-700 text-[12px] font-black uppercase tracking-wider border-b border-slate-300">
-              <th className="p-4 w-[25%] text-center border-r border-slate-300">질문사항</th>
-              <th className="p-4 w-[12%] text-center border-r border-slate-300">점수</th>
-              <th className="p-4 w-[63%] text-center">배점기준</th>
-            </tr>
-          </thead>
+          <thead><tr className="bg-[#f8fafc] text-slate-700 text-[12px] font-black border-b border-slate-300"><th className="p-4 w-[25%] text-center border-r border-slate-300">질문사항</th><th className="p-4 w-[12%] text-center border-r border-slate-300">점수</th><th className="p-4 w-[63%] text-center">배점기준</th></tr></thead>
           <tbody>
-            {currentQuestions.map((q) => (
+            {(allQuestions[activeTab] || []).map((q) => (
               <tr key={q.id} className="border-b border-slate-300 last:border-b-0 hover:bg-slate-50/30 transition-colors">
-                <td className="p-5 font-bold border-r border-slate-300 bg-slate-50/20 text-slate-800">
-                  <input 
-                    type="text" 
-                    value={q.label} 
-                    onChange={(e) => updateQuestionText(q.id, 'label', e.target.value)} 
-                    placeholder="질문 내용을 입력하세요" 
-                    className="w-full p-2 border-b border-transparent font-bold bg-transparent outline-none focus:border-blue-500 focus:bg-white transition-all placeholder:text-slate-300" 
-                  />
-                </td>
-                <td className="p-4 text-center border-r border-slate-300">
-                  <div className="flex flex-col items-center gap-1">
-                    <input 
-                      type="number" 
-                      min="0" max="10" 
-                      value={scores[q.id] || ''} 
-                      onChange={(e) => handleScoreChange(q.id, e.target.value)} 
-                      className="w-16 h-12 text-center text-2xl font-black text-blue-600 bg-white border-2 border-slate-100 rounded-xl outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50 transition-all" 
-                      placeholder="0" 
-                    />
-                    <span className="text-[10px] font-bold text-slate-300 uppercase">Max 10</span>
-                  </div>
-                </td>
-                <td className="p-4">
-                  <textarea 
-                    value={q.guide} 
-                    onChange={(e) => updateQuestionText(q.id, 'guide', e.target.value)} 
-                    placeholder="평가 기준을 입력하세요." 
-                    className="w-full min-h-[110px] p-4 border border-slate-100 text-[13px] outline-none focus:border-blue-300 bg-white/50 rounded-lg resize-none leading-relaxed shadow-inner" 
-                  />
-                </td>
+                <td className="p-5 font-bold border-r border-slate-300 bg-slate-50/20"><input type="text" value={q.label} onChange={(e) => updateQuestionText(q.id, 'label', e.target.value)} placeholder="질문 내용을 입력하세요" className="w-full p-2 border-b border-transparent font-bold bg-transparent outline-none focus:border-blue-500 transition-all" /></td>
+                <td className="p-4 text-center border-r border-slate-300"><div className="flex flex-col items-center gap-1"><input type="number" min="0" max="10" value={scores[q.id] || ''} onChange={(e) => handleScoreChange(q.id, e.target.value)} className="w-16 h-12 text-center text-2xl font-black text-blue-600 bg-white border-2 border-slate-100 rounded-xl outline-none focus:border-blue-400" placeholder="0" /><span className="text-[10px] font-bold text-slate-300">Max 10</span></div></td>
+                <td className="p-4"><textarea value={q.guide} onChange={(e) => updateQuestionText(q.id, 'guide', e.target.value)} placeholder="평가 기준을 입력하세요." className="w-full min-h-[110px] p-4 border border-slate-100 text-[13px] outline-none focus:border-blue-300 bg-white/50 rounded-lg resize-none" /></td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      {/* 종합 의견 섹션 */}
-      <div className="mt-10 bg-white border b`order-slate-300 flex min-h-[180px] shadow-sm rounded-sm overflow-hidden">
-        <div className="w-[160px] bg-slate-100 border-r border-slate-300 p-6 flex flex-col items-center justify-center gap-2">
-          <span className="text-2xl">✍️</span>
-          <span className="font-black text-slate-500 text-center text-xs uppercase tracking-widest leading-tight">세부<br/>의견</span>
-        </div>
-        <div className="flex-1">
-          <textarea 
-            value={comment} 
-            onChange={(e) => setComment(e.target.value)} 
-            placeholder={`[${activeTab}] 카테고리에 대한 종합적인 검토 의견을 입력하세요.`} 
-            className="w-full h-full p-8 outline-none text-[15px] resize-none leading-relaxed placeholder:text-slate-300 font-medium" 
-          />
-        </div>
+      <div className="mt-10 bg-white border border-slate-300 flex min-h-[180px] shadow-sm rounded-sm overflow-hidden">
+        <div className="w-[160px] bg-slate-100 border-r border-slate-300 p-6 flex flex-col items-center justify-center gap-2"><span className="text-2xl">✍️</span><span className="font-black text-slate-500 text-center text-xs uppercase tracking-widest">세부<br/>의견</span></div>
+        <div className="flex-1"><textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder={`[${activeTab}] 카테고리에 대한 종합적인 검토 의견을 입력하세요.`} className="w-full h-full p-8 outline-none text-[15px] resize-none leading-relaxed" /></div>
       </div>
 
-      {/* 하단 버튼 제어 */}
       <div className="mt-14 flex justify-end items-center gap-6">
-        <button 
-          onClick={handleSave} 
-          disabled={isSaving} 
-          className="px-14 py-5 bg-[#232d3f] text-white font-black rounded-sm shadow-2xl hover:bg-blue-600 active:scale-95 transition-all uppercase tracking-[0.2em] text-sm"
-        >
-          {isSaving ? 'Processing...' : `Save ${activeTab} Data`}
-        </button>
+        <button onClick={handleSave} disabled={isSaving} className="px-14 py-5 bg-[#232d3f] text-white font-black rounded-sm shadow-2xl hover:bg-blue-600 active:scale-95 transition-all text-sm">{isSaving ? '저장 중...' : `${activeTab} 데이터 저장`}</button>
       </div>
     </div>
   );

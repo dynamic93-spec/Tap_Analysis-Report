@@ -328,10 +328,11 @@ function FormContent() {
 
       {/* □ 4. 투자 현황 */}
       <section className="mb-10">
-        <div className="flex justify-between items-center mb-2">
+        <div className="flex justify-between items-center mb-3">
           <SectionTitle title="□ 투자 현황" noMargin />
           <button onClick={() => addRow(investRows, setInvestRows, {period:'', company:'', stage:'', amount:0, pre:0, post:0, note:''})} className="bg-blue-600 text-white px-3 py-1 rounded font-black text-[11px]">+ 투자추가</button>
         </div>
+        <div className="text-right text-[10px] text-gray-500 mb-1">(단위 : 백만 원)</div> 
         <table className="w-full border-collapse border-t border-gray-400 text-center text-[11px]">
           <thead className="bg-gray-100 font-black border-b">
             <tr><th className="border p-2">시기</th><th className="border p-2">기관명</th><th className="border p-2">단계</th><th className="border p-2">투자금</th><th className="border p-2">Pre</th><th className="border p-2">Post</th><th className="border w-8">X</th></tr>

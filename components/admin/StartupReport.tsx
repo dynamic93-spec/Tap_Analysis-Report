@@ -113,6 +113,23 @@ export default function StartupReport({ selectedItem: initialItem, onClose }: Pr
     });
   };
 
+  // --- 관계 테이블 행 추가/삭제 ---
+  const addArrayRow = (arrayField: string, template: Record<string, any>) => {
+    setEditData((prev: any) => ({
+      ...prev,
+      [arrayField]: [...(prev[arrayField] || []), { ...template, _isNew: true, _tempId: Date.now() }]
+    }));
+  };
+
+  const deleteArrayRow = (arrayField: string, index: number) => {
+    if (!confirm('이 행을 삭제하시겠습니까?')) return;
+    setEditData((prev: any) => {
+      const updated = [...(prev[arrayField] || [])];
+      updated.splice(index, 1);
+      return { ...prev, [arrayField]: updated };
+    });
+  };
+
   useEffect(() => {
     const loadData = async () => {
       if (!initialItem?.id) return;
@@ -178,7 +195,7 @@ export default function StartupReport({ selectedItem: initialItem, onClose }: Pr
       // 메인 테이블 업데이트 Promise
       promises.push(supabase.from('startups').update(mainDataPayload).eq('id', editData.id));
 
-      // 2. 7개 관계 테이블 업데이트 Promise (배열 순회하며 id 기준 업데이트)
+      // 2. 7개 관계 테이블 업데이트/삽입 Promise
       const relations = [
         { key: 'education', table: 'startup_education' },
         { key: 'careers', table: 'startup_careers' },
@@ -191,7 +208,13 @@ export default function StartupReport({ selectedItem: initialItem, onClose }: Pr
 
       relations.forEach(({ key, table }) => {
         (editData[key] || []).forEach((item: any) => {
-          if (item.id) {
+          // 새로 추가된 행 → insert
+          if (item._isNew) {
+            const { _isNew, _tempId, ...cleanItem } = item;
+            promises.push(supabase.from(table).insert({ ...cleanItem, startup_id: editData.id }));
+          }
+          // 기존 행 → update
+          else if (item.id) {
             promises.push(supabase.from(table).update(item).eq('id', item.id));
           }
         });
@@ -382,59 +405,97 @@ export default function StartupReport({ selectedItem: initialItem, onClose }: Pr
       {/* □ 2. 학력 및 경력 */}
       <SectionTitle title="□ 대표자 학력 및 경력" />
       <div className="grid grid-cols-2 gap-6 mb-10">
-        <table className="w-full border-collapse border-t border-slate-400 text-center">
-          <thead className="bg-slate-50 font-bold"><tr><th className="border p-2 w-[120px]">학력</th><th className="border p-2">학교/학과</th></tr></thead>
-          <tbody>{(currentViewData.education || []).map((e: any, i: number) => (
-            <tr key={e.id || i}>
-              <td className="border p-1 bg-slate-50/50 font-bold">
-                <EditableText isEditing={isEditing} value={e.degree_type} onChange={(v) => updateArrayItem('education', i, 'degree_type', v)} className="text-center" />
-              </td>
-              <td className="border p-1">
-                {isEditing ? (
-                  <div className="flex gap-1">
-                    <EditableText isEditing={true} value={e.school_name} onChange={(v) => updateArrayItem('education', i, 'school_name', v)} />
-                    <EditableText isEditing={true} value={e.department} onChange={(v) => updateArrayItem('education', i, 'department', v)} />
-                  </div>
-                ) : (
-                  <span>{e.school_name} {e.department}</span>
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[12px] font-bold text-slate-500">학력</span>
+            {isEditing && (
+              <button onClick={() => addArrayRow('education', { degree_type: '', school_name: '', department: '' })} className="px-2 py-1 bg-blue-600 text-white text-[10px] font-bold rounded hover:bg-blue-700 active:scale-95">+ 학력 추가</button>
+            )}
+          </div>
+          <table className="w-full border-collapse border-t border-slate-400 text-center">
+            <thead className="bg-slate-50 font-bold"><tr><th className="border p-2 w-[120px]">학력</th><th className="border p-2">학교/학과</th>{isEditing && <th className="border p-2 w-[40px]">삭제</th>}</tr></thead>
+            <tbody>{(currentViewData.education || []).map((e: any, i: number) => (
+              <tr key={e.id || e._tempId || i}>
+                <td className="border p-1 bg-slate-50/50 font-bold">
+                  <EditableText isEditing={isEditing} value={e.degree_type} onChange={(v) => updateArrayItem('education', i, 'degree_type', v)} className="text-center" />
+                </td>
+                <td className="border p-1">
+                  {isEditing ? (
+                    <div className="flex gap-1">
+                      <EditableText isEditing={true} value={e.school_name} onChange={(v) => updateArrayItem('education', i, 'school_name', v)} />
+                      <EditableText isEditing={true} value={e.department} onChange={(v) => updateArrayItem('education', i, 'department', v)} />
+                    </div>
+                  ) : (
+                    <span>{e.school_name} {e.department}</span>
+                  )}
+                </td>
+                {isEditing && (
+                  <td className="border p-1"><button onClick={() => deleteArrayRow('education', i)} className="text-red-400 hover:text-red-600 font-bold text-[12px]">✕</button></td>
                 )}
-              </td>
-            </tr>
-          ))}</tbody>
-        </table>
-        <table className="w-full border-collapse border-t border-slate-400 text-center">
-          <thead className="bg-slate-50 font-bold"><tr><th className="border p-2 w-[140px]">기간</th><th className="border p-2">회사/업무</th></tr></thead>
-          <tbody>{(currentViewData.careers || []).map((c: any, i: number) => (
-            <tr key={c.id || i}>
-              <td className="border p-1 bg-slate-50/50 font-bold">
-                <EditableText isEditing={isEditing} value={c.period} onChange={(v) => updateArrayItem('careers', i, 'period', v)} className="text-center" />
-              </td>
-              <td className="border p-1">
-                {isEditing ? (
-                  <div className="flex gap-1">
-                    <EditableText isEditing={true} value={c.company_name} onChange={(v) => updateArrayItem('careers', i, 'company_name', v)} />
-                    <EditableText isEditing={true} value={c.task} onChange={(v) => updateArrayItem('careers', i, 'task', v)} />
-                  </div>
-                ) : (
-                  <span>{c.company_name} ({c.task})</span>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[12px] font-bold text-slate-500">경력</span>
+            {isEditing && (
+              <button onClick={() => addArrayRow('careers', { period: '', company_name: '', task: '' })} className="px-2 py-1 bg-blue-600 text-white text-[10px] font-bold rounded hover:bg-blue-700 active:scale-95">+ 경력 추가</button>
+            )}
+          </div>
+          <table className="w-full border-collapse border-t border-slate-400 text-center">
+            <thead className="bg-slate-50 font-bold"><tr><th className="border p-2 w-[140px]">기간</th><th className="border p-2">회사/업무</th>{isEditing && <th className="border p-2 w-[40px]">삭제</th>}</tr></thead>
+            <tbody>{(currentViewData.careers || []).map((c: any, i: number) => (
+              <tr key={c.id || c._tempId || i}>
+                <td className="border p-1 bg-slate-50/50 font-bold">
+                  <EditableText isEditing={isEditing} value={c.period} onChange={(v) => updateArrayItem('careers', i, 'period', v)} className="text-center" />
+                </td>
+                <td className="border p-1">
+                  {isEditing ? (
+                    <div className="flex gap-1">
+                      <EditableText isEditing={true} value={c.company_name} onChange={(v) => updateArrayItem('careers', i, 'company_name', v)} />
+                      <EditableText isEditing={true} value={c.task} onChange={(v) => updateArrayItem('careers', i, 'task', v)} />
+                    </div>
+                  ) : (
+                    <span>{c.company_name} ({c.task})</span>
+                  )}
+                </td>
+                {isEditing && (
+                  <td className="border p-1"><button onClick={() => deleteArrayRow('careers', i)} className="text-red-400 hover:text-red-600 font-bold text-[12px]">✕</button></td>
                 )}
-              </td>
-            </tr>
-          ))}</tbody>
-        </table>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
       </div>
 
       {/* □ 3. 매출 및 고용 */}
-      <SectionTitle title="□ 매출 및 고용" />
+      <div className="flex items-center justify-between">
+        <SectionTitle title="□ 매출 및 고용" />
+        {isEditing && (
+          <button onClick={() => {
+            const year = prompt('추가할 연도를 입력하세요 (예: 2023):');
+            if (!year) return;
+            addArrayRow('financials', { year, revenue_domestic: 0, revenue_overseas: 0, employees: 0 });
+          }} className="px-3 py-1.5 bg-blue-600 text-white text-[11px] font-bold rounded-lg hover:bg-blue-700 transition-all active:scale-95 shadow-md">+ 연도 추가</button>
+        )}
+      </div>
       <table className="w-full border-collapse border-t border-slate-400 text-center mb-10">
         <thead className="bg-slate-100 font-bold border-b">
           <tr>
             <th rowSpan={2} className="border p-2 bg-slate-50">구분</th>
-            {targetYears.map(year => <th key={year} colSpan={2} className="border p-2">{year}년</th>)}
+            {(currentViewData.financials || []).map((f: any, i: number) => (
+              <th key={f.id || f._tempId || i} colSpan={2} className="border p-2 relative">
+                {f.year}년
+                {isEditing && (
+                  <button onClick={() => deleteArrayRow('financials', i)} className="absolute top-0.5 right-0.5 w-4 h-4 text-red-400 hover:text-red-600 text-[10px]">✕</button>
+                )}
+              </th>
+            ))}
           </tr>
           <tr className="bg-slate-50 text-[11px]">
-            {targetYears.map(year => (
-              <React.Fragment key={year}>
+            {(currentViewData.financials || []).map((f: any, i: number) => (
+              <React.Fragment key={f.id || f._tempId || i}>
                 <th className="border p-1">국내</th>
                 <th className="border p-1">해외</th>
               </React.Fragment>
@@ -444,45 +505,44 @@ export default function StartupReport({ selectedItem: initialItem, onClose }: Pr
         <tbody>
           <tr>
             <td className="border p-2 font-bold bg-slate-50">매출액</td>
-            {targetYears.map(year => {
-              const finIndex = (currentViewData.financials || []).findIndex((f: any) => String(f.year) === String(year));
-              const fin = finIndex >= 0 ? currentViewData.financials[finIndex] : null;
-              
-              return (
-                <React.Fragment key={year}>
-                  <td className="border p-1 font-bold text-blue-600">
-                    {finIndex >= 0 ? <EditableText isEditing={isEditing} type="number" value={fin.revenue_domestic} onChange={(v) => updateArrayItem('financials', finIndex, 'revenue_domestic', v)} className="text-center text-blue-600 font-bold" /> : '-'}
-                  </td>
-                  <td className="border p-1 font-bold text-blue-600">
-                    {finIndex >= 0 ? <EditableText isEditing={isEditing} type="number" value={fin.revenue_overseas} onChange={(v) => updateArrayItem('financials', finIndex, 'revenue_overseas', v)} className="text-center text-blue-600 font-bold" /> : '-'}
-                  </td>
-                </React.Fragment>
-              );
-            })}
+            {(currentViewData.financials || []).map((fin: any, finIndex: number) => (
+              <React.Fragment key={fin.id || fin._tempId || finIndex}>
+                <td className="border p-1 font-bold text-blue-600">
+                  <EditableText isEditing={isEditing} type="number" value={fin.revenue_domestic} onChange={(v) => updateArrayItem('financials', finIndex, 'revenue_domestic', v)} className="text-center text-blue-600 font-bold" />
+                </td>
+                <td className="border p-1 font-bold text-blue-600">
+                  <EditableText isEditing={isEditing} type="number" value={fin.revenue_overseas} onChange={(v) => updateArrayItem('financials', finIndex, 'revenue_overseas', v)} className="text-center text-blue-600 font-bold" />
+                </td>
+              </React.Fragment>
+            ))}
           </tr>
           <tr>
             <td className="border p-2 font-bold bg-slate-50">고용</td>
-            {targetYears.map(year => {
-              const finIndex = (currentViewData.financials || []).findIndex((f: any) => String(f.year) === String(year));
-              const fin = finIndex >= 0 ? currentViewData.financials[finIndex] : null;
-              return (
-                <td key={year} colSpan={2} className="border p-1 font-bold text-slate-700">
-                   {finIndex >= 0 ? <EditableText isEditing={isEditing} type="number" value={fin.employees} onChange={(v) => updateArrayItem('financials', finIndex, 'employees', v)} className="text-center font-bold" /> : '-'}
-                </td>
-              )
-            })}
+            {(currentViewData.financials || []).map((fin: any, finIndex: number) => (
+              <td key={fin.id || fin._tempId || finIndex} colSpan={2} className="border p-1 font-bold text-slate-700">
+                <EditableText isEditing={isEditing} type="number" value={fin.employees} onChange={(v) => updateArrayItem('financials', finIndex, 'employees', v)} className="text-center font-bold" />
+              </td>
+            ))}
           </tr>
         </tbody>
       </table>
 
       {/* □ 4. 투자 현황 */}
-      <SectionTitle title="□ 투자 현황" />
+      <div className="flex items-center justify-between">
+        <SectionTitle title="□ 투자 현황" />
+        {isEditing && (
+          <button onClick={() => addArrayRow('investments', { period: '', investor: '', round: '', amount: 0, pre_share: 0, post_share: 0 })} className="px-3 py-1.5 bg-blue-600 text-white text-[11px] font-bold rounded-lg hover:bg-blue-700 transition-all active:scale-95 shadow-md">+ 투자 추가</button>
+        )}
+      </div>
       <table className="w-full border-collapse border-t border-slate-400 text-center mb-10">
         <thead className="bg-slate-100 font-black border-b border-slate-300">
-          <tr><th className="border p-2 w-[100px]">시기</th><th className="border p-2">투자사</th><th className="border p-2 w-[80px]">단계</th><th className="border p-2 text-blue-700">투자금</th><th className="border p-2">Pre</th><th className="border p-2">Post</th></tr>
+          <tr>
+            <th className="border p-2 w-[100px]">시기</th><th className="border p-2">투자사</th><th className="border p-2 w-[80px]">단계</th><th className="border p-2 text-blue-700">투자금</th><th className="border p-2">Pre</th><th className="border p-2">Post</th>
+            {isEditing && <th className="border p-2 w-[40px]">삭제</th>}
+          </tr>
         </thead>
         <tbody>{(currentViewData.investments || []).map((inv: any, i: number) => (
-          <tr key={inv.id || i}>
+          <tr key={inv.id || inv._tempId || i}>
             <td className="border p-1">
               <EditableText isEditing={isEditing} value={inv.period} onChange={(v) => updateArrayItem('investments', i, 'period', v)} className="text-center" />
             </td>
@@ -501,6 +561,11 @@ export default function StartupReport({ selectedItem: initialItem, onClose }: Pr
             <td className="border p-1 font-bold text-red-600">
               <EditableText isEditing={isEditing} type="number" value={inv.post_share} onChange={(v) => updateArrayItem('investments', i, 'post_share', v)} className="text-center text-red-600 font-bold" />
             </td>
+            {isEditing && (
+              <td className="border p-1">
+                <button onClick={() => deleteArrayRow('investments', i)} className="text-red-400 hover:text-red-600 font-bold text-[12px]">✕</button>
+              </td>
+            )}
           </tr>
         ))}</tbody>
         <tfoot className="bg-slate-50 font-black border-t-2 border-slate-800">
@@ -517,6 +582,9 @@ export default function StartupReport({ selectedItem: initialItem, onClose }: Pr
       <div className="grid grid-cols-2 gap-8 mb-10 items-start">
         <section>
           <SectionTitle title="□ 지식재산권 (건)" />
+          {isEditing && !(currentViewData.ips?.length > 0) && (
+            <button onClick={() => addArrayRow('ips', { domestic: 0, overseas: 0 })} className="mb-2 px-3 py-1 bg-blue-600 text-white text-[10px] font-bold rounded hover:bg-blue-700 active:scale-95">+ IP 데이터 추가</button>
+          )}
           <table className="w-full border-collapse border-t border-slate-400 text-center">
             <thead className="bg-[#f1f5f9] font-bold border-b border-slate-400">
               <tr><th className="p-2 border-r border-slate-300">국내</th><th className="p-2">해외</th></tr>
@@ -538,14 +606,19 @@ export default function StartupReport({ selectedItem: initialItem, onClose }: Pr
           </table>
         </section>
         <section>
-          <SectionTitle title="□ 참여 및 수상" />
+          <div className="flex items-center justify-between">
+            <SectionTitle title="□ 참여 및 수상" />
+            {isEditing && (
+              <button onClick={() => addArrayRow('awards', { year: '', award_name: '', agency: '' })} className="px-2 py-1 bg-blue-600 text-white text-[10px] font-bold rounded hover:bg-blue-700 active:scale-95">+ 수상 추가</button>
+            )}
+          </div>
           <table className="w-full border-collapse border-t border-slate-400 text-center text-[11px]">
             <thead className="bg-[#f1f5f9] font-bold border-b border-slate-400">
-              <tr><th className="p-2 border-r border-slate-300 w-[60px]">연도</th><th className="p-2 border-r border-slate-300">행사명</th><th className="p-2 w-[100px]">주최</th></tr>
+              <tr><th className="p-2 border-r border-slate-300 w-[60px]">연도</th><th className="p-2 border-r border-slate-300">행사명</th><th className="p-2 w-[100px]">주최</th>{isEditing && <th className="p-2 w-[40px]">삭제</th>}</tr>
             </thead>
             <tbody>
               {currentViewData.awards?.length > 0 ? currentViewData.awards.map((row: any, i: number) => (
-                <tr key={row.id || i} className="border-b border-slate-200">
+                <tr key={row.id || row._tempId || i} className="border-b border-slate-200">
                   <td className="border-r border-slate-300 p-1">
                     <EditableText isEditing={isEditing} value={row.year} onChange={(v) => updateArrayItem('awards', i, 'year', v)} className="text-center" />
                   </td>
@@ -555,18 +628,29 @@ export default function StartupReport({ selectedItem: initialItem, onClose }: Pr
                   <td className="p-1 text-left text-slate-600">
                      <EditableText isEditing={isEditing} value={row.agency} onChange={(v) => updateArrayItem('awards', i, 'agency', v)} />
                   </td>
+                  {isEditing && (
+                    <td className="p-1"><button onClick={() => deleteArrayRow('awards', i)} className="text-red-400 hover:text-red-600 font-bold text-[12px]">✕</button></td>
+                  )}
                 </tr>
-              )) : <tr><td colSpan={3} className="p-4 text-slate-400">데이터가 없습니다.</td></tr>}
+              )) : <tr><td colSpan={isEditing ? 4 : 3} className="p-4 text-slate-400">데이터가 없습니다.</td></tr>}
             </tbody>
           </table>
         </section>
       </div>
 
       {/* □ 6. 제품 상세 소개 */}
-      <SectionTitle title="□ 제품 및 기술 상세 소개" />
+      <div className="flex items-center justify-between">
+        <SectionTitle title="□ 제품 및 기술 상세 소개" />
+        {isEditing && (
+          <button onClick={() => addArrayRow('services', { title: '', content: '' })} className="px-3 py-1.5 bg-blue-600 text-white text-[11px] font-bold rounded-lg hover:bg-blue-700 transition-all active:scale-95 shadow-md">+ 항목 추가</button>
+        )}
+      </div>
       <div className="space-y-4 mb-10">
         {(currentViewData.services || []).length > 0 ? (currentViewData.services || []).map((svc: any, i: number) => (
-          <div key={svc.id || i} className="border-2 border-slate-800 p-6 bg-slate-50/30 rounded-2xl shadow-sm">
+          <div key={svc.id || svc._tempId || i} className="border-2 border-slate-800 p-6 bg-slate-50/30 rounded-2xl shadow-sm relative">
+            {isEditing && (
+              <button onClick={() => deleteArrayRow('services', i)} className="absolute top-3 right-4 text-red-400 hover:text-red-600 font-bold text-[14px]">✕</button>
+            )}
             <div className="font-black text-[16px] mb-2 text-slate-900 flex items-center">
               <span className="text-blue-600 mr-2">●</span>
               <div className="flex-1">

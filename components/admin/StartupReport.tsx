@@ -222,17 +222,36 @@ export default function StartupReport({ selectedItem: initialItem, onClose }: Pr
 
       await Promise.all(promises);
 
-      // 성공 처리
-      setData(editData);
+      // 성공 후 Supabase에서 최신 데이터 다시 로드 (중복 방지 핵심)
+      const { data: freshData } = await supabase
+        .from('startups')
+        .select(`
+          *,
+          education:startup_education(*),
+          careers:startup_careers(*),
+          investments:startup_investments(*),
+          ips:startup_ips(*),
+          awards:startup_awards(*),
+          financials:startup_financials(*),
+          services:startup_services(*)
+        `)
+        .eq('id', editData.id)
+        .single();
+
+      if (freshData) {
+        setData(freshData);
+        setEditData(JSON.parse(JSON.stringify(freshData)));
+      }
+
       setIsEditing(false);
       setStatusMessage({ text: "저장 완료", type: 'success' });
-      
+
     } catch (error) {
       console.error("Save error:", error);
       setStatusMessage({ text: "저장 실패. 다시 시도해주세요.", type: 'error' });
     } finally {
       setSaving(false);
-      setTimeout(() => setStatusMessage(null), 3000); // 3초 후 메시지 소멸
+      setTimeout(() => setStatusMessage(null), 3000);
     }
   };
 

@@ -86,6 +86,33 @@ export default function StartupReport({ selectedItem: initialItem, onClose }: Pr
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
 
+  // --- 커스텀 필드 관리 ---
+  const addCustomField = () => {
+    const label = prompt("추가할 항목명을 입력하세요:");
+    if (!label) return;
+    setEditData((prev: any) => ({
+      ...prev,
+      custom_fields: [...(prev.custom_fields || []), { label, value: '' }]
+    }));
+  };
+
+  const updateCustomField = (index: number, key: 'label' | 'value', value: string) => {
+    setEditData((prev: any) => {
+      const updated = [...(prev.custom_fields || [])];
+      updated[index] = { ...updated[index], [key]: value };
+      return { ...prev, custom_fields: updated };
+    });
+  };
+
+  const deleteCustomField = (index: number) => {
+    if (!confirm('이 항목을 삭제하시겠습니까?')) return;
+    setEditData((prev: any) => {
+      const updated = [...(prev.custom_fields || [])];
+      updated.splice(index, 1);
+      return { ...prev, custom_fields: updated };
+    });
+  };
+
   useEffect(() => {
     const loadData = async () => {
       if (!initialItem?.id) return;
@@ -568,6 +595,62 @@ export default function StartupReport({ selectedItem: initialItem, onClose }: Pr
           <EditableTextarea isEditing={isEditing} value={currentViewData.support_needs_other} onChange={(v) => updateField('support_needs_other', v)} className="mt-2" />
         </div>
       </div>
+
+      {/* □ 8. 추가 항목 (커스텀 필드) */}
+      {((currentViewData.custom_fields || []).length > 0 || isEditing) && (
+        <section className="mb-10">
+          <div className="flex items-center justify-between mb-4">
+            <SectionTitle title="□ 추가 항목" />
+            {isEditing && (
+              <button
+                onClick={addCustomField}
+                className="px-4 py-2 bg-blue-600 text-white text-[12px] font-bold rounded-lg hover:bg-blue-700 transition-all active:scale-95 shadow-md"
+              >
+                + 항목 추가
+              </button>
+            )}
+          </div>
+          <div className="border-t-2 border-slate-800 border-x border-slate-200 border-b shadow-sm">
+            {(currentViewData.custom_fields || []).map((field: any, i: number) => (
+              <div key={i} className="flex border-b border-slate-200 last:border-b-0">
+                <div className="w-[160px] bg-[#f1f5f9] p-3 flex items-center justify-center font-bold border-r border-slate-200 text-slate-600 text-[13px] text-center shrink-0">
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={field.label}
+                      onChange={(e) => updateCustomField(i, 'label', e.target.value)}
+                      className="w-full px-2 py-1 bg-blue-50/60 border border-blue-200 rounded outline-none focus:border-blue-500 text-center text-slate-900 font-bold"
+                      placeholder="항목명"
+                    />
+                  ) : (
+                    <span>{field.label}</span>
+                  )}
+                </div>
+                <div className="flex-1 p-3 flex items-center bg-white text-slate-800 text-[13px]">
+                  <EditableText
+                    isEditing={isEditing}
+                    value={field.value}
+                    onChange={(v) => updateCustomField(i, 'value', v)}
+                  />
+                </div>
+                {isEditing && (
+                  <button
+                    onClick={() => deleteCustomField(i)}
+                    className="w-10 flex items-center justify-center bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-700 transition-colors border-l border-slate-200 text-[12px] font-bold shrink-0"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+            {(currentViewData.custom_fields || []).length === 0 && isEditing && (
+              <div className="p-6 text-center text-slate-400 text-[13px]">
+                위의 &apos;+ 항목 추가&apos; 버튼을 눌러 새로운 필드를 추가하세요.
+              </div>
+            )}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

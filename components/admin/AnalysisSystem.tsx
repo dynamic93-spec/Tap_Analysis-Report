@@ -39,8 +39,7 @@ const DEFAULT_QUESTIONS: Record<string, any[]> = {
     { id: 'mkt_5', label: '시장 진입장벽', guide: '법적/기술적 장벽 유무, 파트너십' }
   ],
   '지식재산권 포트폴리오': [
-    { id: 'fin_1', label: '특허포트폴리의 전략성', guide: '해외PCT 및 타겟 국가 대상 특허 취득 여부'
-     }
+    { id: 'fin_1', label: '특허포트폴리의 전략성', guide: '해외PCT 및 타겟 국가 대상 특허 취득 여부'},
     { id: 'fin_2', label: '해외 특허 출원 및 등록', guide: '해외PCT 및 타겟 국가 대상 특허 취득 여부' }, 
     { id: 'fin_3', label: '특허 포트폴리오 주관성/유관성', guide: '법인 단독 소유 혹은 기술 이전 여부 등' },
     { id: 'fin_4', label: 'IP 보호전략(특허 제외)', guide: '영업비밀 관리 시스템, 데이터 라벨링' },

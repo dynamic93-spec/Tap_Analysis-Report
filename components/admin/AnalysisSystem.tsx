@@ -39,7 +39,7 @@ const DEFAULT_QUESTIONS: Record<string, any[]> = {
     { id: 'mkt_5', label: '시장 진입장벽', guide: '법적/기술적 장벽 유무, 파트너십' }
   ],
   '지식재산권 포트폴리오': [
-    { id: 'fin_1', label: '특허포트폴리의 전략성', guide: '해외PCT 및 타겟 국가 대상 특허 취득 여부'},
+    { id: 'fin_1', label: '특허포트폴리오의 전략성', guide: '해외PCT 및 타겟 국가 대상 특허 취득 여부'},
     { id: 'fin_2', label: '해외 특허 출원 및 등록', guide: '해외PCT 및 타겟 국가 대상 특허 취득 여부' }, 
     { id: 'fin_3', label: '특허 포트폴리오 주관성/유관성', guide: '법인 단독 소유 혹은 기술 이전 여부 등' },
     { id: 'fin_4', label: 'IP 보호전략(특허 제외)', guide: '영업비밀 관리 시스템, 데이터 라벨링' },
@@ -67,7 +67,8 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
       const { data: folderAnalysis, error } = await supabase
         .from('startup_analysis')
         .select('*')
-        .eq('folder_id', currentFolderId);
+        .eq('folder_id', currentFolderId)
+        .order('updated_at', { ascending: true });
 
       if (error) throw error;
 
@@ -75,16 +76,15 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
       let newCustomTabs: string[] = [];
 
       if (folderAnalysis && folderAnalysis.length > 0) {
-        // 고정 탭(사업성 등)은 항상 코드의 DEFAULT_QUESTIONS를 사용하고,
-        // DB의 extra_questions는 커스텀 탭에만 적용 (코드 수정이 즉시 반영되도록)
+        // 웹에서 수정한 질문지(extra_questions)가 있으면 고정/커스텀 탭 모두 적용
+        // (updated_at 오름차순 조회이므로 가장 최근에 저장된 질문지가 최종 적용됨)
+        // DEFAULT_QUESTIONS는 저장된 질문지가 없을 때의 초기 템플릿 역할
         folderAnalysis.forEach((d: any) => {
-          if (!fixedTabs.includes(d.category)) {
-            if (d.extra_questions && d.extra_questions.length > 0) {
-              updatedQuestions[d.category] = d.extra_questions;
-            }
-            if (!newCustomTabs.includes(d.category)) {
-              newCustomTabs.push(d.category);
-            }
+          if (d.extra_questions && d.extra_questions.length > 0) {
+            updatedQuestions[d.category] = d.extra_questions;
+          }
+          if (!fixedTabs.includes(d.category) && !newCustomTabs.includes(d.category)) {
+            newCustomTabs.push(d.category);
           }
         });
 
@@ -176,9 +176,7 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
     setIsSaving(true);
     
     try {
-      // 1. 현재 작성 중인 질문지(extra_questions)
-      // 고정 탭은 질문지가 코드(DEFAULT_QUESTIONS)에서 관리되므로 DB에 저장하지 않음
-      const isCustomTab = !fixedTabs.includes(activeTab);
+      // 1. 현재 작성 중인 질문지(extra_questions) — 고정/커스텀 탭 모두 웹에서 수정한 내용을 저장
       const currentQuestions = allQuestions[activeTab] || [];
 
       // 2. 현재 선택된 기업의 데이터 저장 (Upsert)
@@ -191,23 +189,21 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
           scores: scores,
           total_score: Object.values(scores).reduce((a, b) => a + (Number(b) || 0), 0),
           comment: comment,
-          extra_questions: isCustomTab ? currentQuestions : null,
+          extra_questions: currentQuestions,
           updated_at: new Date().toISOString()
         }, { onConflict: 'startup_id, category' });
 
       if (mySaveError) throw mySaveError;
 
-      // 3. [동기화] 커스텀 탭인 경우에만 같은 폴더 내 다른 기업들에게 질문지 전파
+      // 3. [동기화] 같은 폴더 내 다른 기업들에게도 질문지(label, guide) 전파
       // 점수(scores)는 건드리지 않고 질문지 메타데이터만 업데이트합니다.
-      if (isCustomTab) {
-        const { error: syncError } = await supabase
-          .from('startup_analysis')
-          .update({ extra_questions: currentQuestions })
-          .eq('folder_id', currentFolderId)
-          .eq('category', activeTab);
+      const { error: syncError } = await supabase
+        .from('startup_analysis')
+        .update({ extra_questions: currentQuestions })
+        .eq('folder_id', currentFolderId)
+        .eq('category', activeTab);
 
-        if (syncError) console.error("Sync Warning:", syncError);
-      }
+      if (syncError) console.error("Sync Warning:", syncError);
 
       alert(`[${activeTab}] 저장이 완료되었습니다.`);
       await loadAllData();
@@ -242,9 +238,7 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
       <div className="bg-white border border-slate-300 shadow-sm rounded-sm">
         <div className="p-5 bg-slate-50 border-b border-slate-300 flex justify-between items-center">
           <h3 className="font-black text-xl text-slate-800 tracking-tight">[{activeTab}] 상세 진단</h3>
-          {!fixedTabs.includes(activeTab) && (
-            <button onClick={handleAddQuestion} className="px-4 py-2 bg-white border border-slate-300 text-slate-600 text-[13px] font-bold rounded-sm hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all">+ 질문 추가</button>
-          )}
+          <button onClick={handleAddQuestion} className="px-4 py-2 bg-white border border-slate-300 text-slate-600 text-[13px] font-bold rounded-sm hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all">+ 질문 추가</button>
         </div>
         <table className="w-full border-collapse">
           <thead><tr className="bg-[#f8fafc] text-slate-700 text-[12px] font-black border-b border-slate-300"><th className="p-4 w-[25%] text-center border-r border-slate-300">질문사항</th><th className="p-4 w-[12%] text-center border-r border-slate-300">점수</th><th className="p-4 w-[63%] text-center">배점기준</th></tr></thead>

@@ -59,6 +59,9 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
   
   const currentFolderId = selectedItem.parent_id;
 
+  // 고정 탭은 코드(DEFAULT_QUESTIONS)가 기준(웹 수정 불가), 커스텀 탭만 웹에서 질문지 수정 가능
+  const isCustomTab = !fixedTabs.includes(activeTab);
+
   useEffect(() => { loadAllData(); }, [selectedItem.id, activeTab]);
 
   const loadAllData = async () => {
@@ -76,18 +79,19 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
       let newCustomTabs: string[] = [];
 
       if (folderAnalysis && folderAnalysis.length > 0) {
-        // 웹에서 수정한 질문지(extra_questions)가 있으면 고정/커스텀 탭 모두 적용
-        // 가장 최근에 저장된 질문지가 최종 적용되도록 정렬 (updated_at이 없는 옛 데이터는 가장 오래된 것으로 취급)
-        // DEFAULT_QUESTIONS는 저장된 질문지가 없을 때의 초기 템플릿 역할
+        // 고정 탭은 항상 코드의 DEFAULT_QUESTIONS를 사용 (코드 수정이 배포 즉시 반영됨)
+        // DB의 extra_questions는 커스텀 탭에만 적용하며, 가장 최근 저장본이 최종 적용되도록 정렬
         const sortedAnalysis = [...folderAnalysis].sort((a: any, b: any) =>
           new Date(a.updated_at || 0).getTime() - new Date(b.updated_at || 0).getTime()
         );
         sortedAnalysis.forEach((d: any) => {
-          if (d.extra_questions && d.extra_questions.length > 0) {
-            updatedQuestions[d.category] = d.extra_questions;
-          }
-          if (!fixedTabs.includes(d.category) && !newCustomTabs.includes(d.category)) {
-            newCustomTabs.push(d.category);
+          if (!fixedTabs.includes(d.category)) {
+            if (d.extra_questions && d.extra_questions.length > 0) {
+              updatedQuestions[d.category] = d.extra_questions;
+            }
+            if (!newCustomTabs.includes(d.category)) {
+              newCustomTabs.push(d.category);
+            }
           }
         });
 
@@ -179,7 +183,7 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
     setIsSaving(true);
     
     try {
-      // 1. 현재 작성 중인 질문지(extra_questions) — 고정/커스텀 탭 모두 웹에서 수정한 내용을 저장
+      // 1. 현재 작성 중인 질문지 — 고정 탭은 코드가 기준이므로 커스텀 탭의 질문지만 DB에 저장
       const currentQuestions = allQuestions[activeTab] || [];
 
       // 2. 현재 선택된 기업의 데이터 저장 (Upsert)
@@ -192,21 +196,23 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
           scores: scores,
           total_score: Object.values(scores).reduce((a, b) => a + (Number(b) || 0), 0),
           comment: comment,
-          extra_questions: currentQuestions,
+          extra_questions: isCustomTab ? currentQuestions : null,
           updated_at: new Date().toISOString()
         }, { onConflict: 'startup_id, category' });
 
       if (mySaveError) throw mySaveError;
 
-      // 3. [동기화] 같은 폴더 내 다른 기업들에게도 질문지(label, guide) 전파
+      // 3. [동기화] 커스텀 탭의 질문지(label, guide)를 같은 폴더 내 다른 기업들에게 전파
       // 점수(scores)는 건드리지 않고 질문지 메타데이터만 업데이트합니다.
-      const { error: syncError } = await supabase
-        .from('startup_analysis')
-        .update({ extra_questions: currentQuestions })
-        .eq('folder_id', currentFolderId)
-        .eq('category', activeTab);
+      if (isCustomTab) {
+        const { error: syncError } = await supabase
+          .from('startup_analysis')
+          .update({ extra_questions: currentQuestions })
+          .eq('folder_id', currentFolderId)
+          .eq('category', activeTab);
 
-      if (syncError) console.error("Sync Warning:", syncError);
+        if (syncError) console.error("Sync Warning:", syncError);
+      }
 
       alert(`[${activeTab}] 저장이 완료되었습니다.`);
       await loadAllData();
@@ -241,16 +247,30 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
       <div className="bg-white border border-slate-300 shadow-sm rounded-sm">
         <div className="p-5 bg-slate-50 border-b border-slate-300 flex justify-between items-center">
           <h3 className="font-black text-xl text-slate-800 tracking-tight">[{activeTab}] 상세 진단</h3>
-          <button onClick={handleAddQuestion} className="px-4 py-2 bg-white border border-slate-300 text-slate-600 text-[13px] font-bold rounded-sm hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all">+ 질문 추가</button>
+          {isCustomTab && (
+            <button onClick={handleAddQuestion} className="px-4 py-2 bg-white border border-slate-300 text-slate-600 text-[13px] font-bold rounded-sm hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all">+ 질문 추가</button>
+          )}
         </div>
         <table className="w-full border-collapse">
           <thead><tr className="bg-[#f8fafc] text-slate-700 text-[12px] font-black border-b border-slate-300"><th className="p-4 w-[25%] text-center border-r border-slate-300">질문사항</th><th className="p-4 w-[12%] text-center border-r border-slate-300">점수</th><th className="p-4 w-[63%] text-center">배점기준</th></tr></thead>
           <tbody>
             {(allQuestions[activeTab] || []).map((q) => (
               <tr key={q.id} className="border-b border-slate-300 last:border-b-0 hover:bg-slate-50/30 transition-colors">
-                <td className="p-5 font-bold border-r border-slate-300 bg-slate-50/20"><input type="text" value={q.label} onChange={(e) => updateQuestionText(q.id, 'label', e.target.value)} placeholder="질문 내용을 입력하세요" className="w-full p-2 border-b border-transparent font-bold bg-transparent outline-none focus:border-blue-500 transition-all" /></td>
+                <td className="p-5 font-bold border-r border-slate-300 bg-slate-50/20">
+                  {isCustomTab ? (
+                    <input type="text" value={q.label} onChange={(e) => updateQuestionText(q.id, 'label', e.target.value)} placeholder="질문 내용을 입력하세요" className="w-full p-2 border-b border-transparent font-bold bg-transparent outline-none focus:border-blue-500 transition-all" />
+                  ) : (
+                    <div className="p-2 font-bold">{q.label}</div>
+                  )}
+                </td>
                 <td className="p-4 text-center border-r border-slate-300"><div className="flex flex-col items-center gap-1"><input type="number" min="0" max="10" value={scores[q.id] || ''} onChange={(e) => handleScoreChange(q.id, e.target.value)} className="w-16 h-12 text-center text-2xl font-black text-blue-600 bg-white border-2 border-slate-100 rounded-xl outline-none focus:border-blue-400" placeholder="0" /><span className="text-[10px] font-bold text-slate-300">Max 10</span></div></td>
-                <td className="p-4"><textarea value={q.guide} onChange={(e) => updateQuestionText(q.id, 'guide', e.target.value)} placeholder="평가 기준을 입력하세요." className="w-full min-h-[110px] p-4 border border-slate-100 text-[13px] outline-none focus:border-blue-3.00 bg-white/50 rounded-lg resize-none" /></td>
+                <td className="p-4">
+                  {isCustomTab ? (
+                    <textarea value={q.guide} onChange={(e) => updateQuestionText(q.id, 'guide', e.target.value)} placeholder="평가 기준을 입력하세요." className="w-full min-h-[110px] p-4 border border-slate-100 text-[13px] outline-none focus:border-blue-300 bg-white/50 rounded-lg resize-none" />
+                  ) : (
+                    <div className="min-h-[110px] p-4 text-[13px] leading-relaxed whitespace-pre-line">{q.guide}</div>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

@@ -33,6 +33,7 @@ const INVESTMENT_STAGES = [
 
 export default function ResultView({ startupId, refreshTrigger }: ResultViewProps) {
   const contentRef = useRef<HTMLDivElement>(null);
+  const investTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [data, setData] = useState<any>(null);
   const [financials, setFinancials] = useState<any[]>([]);
   const [detailedScores, setDetailedScores] = useState<any[]>([]);
@@ -171,6 +172,15 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
     };
     fetchData();
   }, [startupId, refreshTrigger]);
+
+  // 투자 로드맵 텍스트 양에 맞춰 입력창 높이 자동 조절
+  useEffect(() => {
+    const el = investTextareaRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = Math.max(60, el.scrollHeight) + 'px';
+    }
+  }, [investComment, loading]);
 
   if (loading) return null;
 
@@ -318,13 +328,16 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
 
           <div className="section-label">□ 투자 로드맵</div>
           <div className="invest-opinion-box mt-2">
-            <textarea 
+            <textarea
+              ref={investTextareaRef}
               className="invest-opinion-textarea"
               value={investComment}
               onChange={(e) => setInvestComment(e.target.value)}
               placeholder="해당 기업의 투자 현황 및 라운드에 대한 종합 의견을 입력하세요"
               rows={1}
             />
+            {/* 인쇄(PDF) 시에는 textarea 대신 전체 텍스트가 표시되는 박스를 사용 (잘림 방지) */}
+            <div className="invest-opinion-print">{investComment}</div>
           </div>
 
           <div className="section-label">□ 역량 진단 통합 분석</div>
@@ -490,7 +503,8 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
         .future-title-input { font-size: 13px; font-weight: 900; color: #2563eb; border: none; border-bottom: 1px solid #f1f5f9; background: #f8fafc; padding: 10px; }
         .future-content-textarea { width: 100%; flex-grow: 1; border: none; background: transparent; resize: none; outline: none; font-size: 9px; color: #334155; padding: 10px 12px; }
 
-        .invest-opinion-textarea { width: 100%; height: 60px; border: 1px solid #66768b; background: #f1f5f9; border-radius: 3px; resize: none; outline: none; font-size: 11px; padding: 8px; }
+        .invest-opinion-textarea { width: 100%; min-height: 60px; overflow: hidden; border: 1px solid #66768b; background: #f1f5f9; border-radius: 3px; resize: none; outline: none; font-size: 11px; padding: 8px; line-height: 1.5; }
+        .invest-opinion-print { display: none; }
 
         @media print {
           @page { size: A4; margin: 10mm !important; }
@@ -499,7 +513,13 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
           .report-paper-container { box-shadow: none !important; border: none !important; width: 100% !important; margin: 0 !important; }
           .report-cover-page { height: 100vh !important; break-after: page !important; }
           .report-content-page { padding: 0 !important; }
-          .invest-opinion-textarea { background: #ffffff !important; border: 1px solid #cbd5e1 !important; }
+          .invest-opinion-textarea { display: none !important; }
+          .invest-opinion-print {
+            display: block !important; width: 100%; min-height: 60px;
+            border: 1px solid #cbd5e1; background: #ffffff; border-radius: 3px;
+            font-size: 11px; line-height: 1.5; padding: 8px;
+            white-space: pre-wrap; word-break: break-word;
+          }
           .future-input-group { border: 1.5px solid #cbd5e1 !important; }
           tr, .analysis-card, .future-input-group, .radar-layout, .chart-container, .section-label, .dual-layout-grid { break-inside: avoid !important; }
         }

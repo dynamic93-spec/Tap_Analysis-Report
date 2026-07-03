@@ -77,9 +77,12 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
 
       if (folderAnalysis && folderAnalysis.length > 0) {
         // 웹에서 수정한 질문지(extra_questions)가 있으면 고정/커스텀 탭 모두 적용
-        // (updated_at 오름차순 조회이므로 가장 최근에 저장된 질문지가 최종 적용됨)
+        // 가장 최근에 저장된 질문지가 최종 적용되도록 정렬 (updated_at이 없는 옛 데이터는 가장 오래된 것으로 취급)
         // DEFAULT_QUESTIONS는 저장된 질문지가 없을 때의 초기 템플릿 역할
-        folderAnalysis.forEach((d: any) => {
+        const sortedAnalysis = [...folderAnalysis].sort((a: any, b: any) =>
+          new Date(a.updated_at || 0).getTime() - new Date(b.updated_at || 0).getTime()
+        );
+        sortedAnalysis.forEach((d: any) => {
           if (d.extra_questions && d.extra_questions.length > 0) {
             updatedQuestions[d.category] = d.extra_questions;
           }

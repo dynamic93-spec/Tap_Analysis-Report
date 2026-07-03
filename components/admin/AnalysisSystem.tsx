@@ -75,14 +75,16 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
       let newCustomTabs: string[] = [];
 
       if (folderAnalysis && folderAnalysis.length > 0) {
-        // [수정] 폴더 내의 어떤 기업이든 가장 최근에 저장된 질문지(extra_questions)를 찾아서 적용
-        // 이렇게 해야 폴더 공통 질문지가 유지됩니다.
+        // 고정 탭(사업성 등)은 항상 코드의 DEFAULT_QUESTIONS를 사용하고,
+        // DB의 extra_questions는 커스텀 탭에만 적용 (코드 수정이 즉시 반영되도록)
         folderAnalysis.forEach((d: any) => {
-          if (d.extra_questions && d.extra_questions.length > 0) {
-            updatedQuestions[d.category] = d.extra_questions;
-          }
-          if (!fixedTabs.includes(d.category) && !newCustomTabs.includes(d.category)) {
-            newCustomTabs.push(d.category);
+          if (!fixedTabs.includes(d.category)) {
+            if (d.extra_questions && d.extra_questions.length > 0) {
+              updatedQuestions[d.category] = d.extra_questions;
+            }
+            if (!newCustomTabs.includes(d.category)) {
+              newCustomTabs.push(d.category);
+            }
           }
         });
 
@@ -94,8 +96,9 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
         setComment('');
       }
 
-      setAllQuestions(updatedQuestions);
-      setCustomTabs(newCustomTabs);
+      // 아직 DB에 저장되지 않은(방금 추가한) 커스텀 탭과 질문지는 유지하면서 병합
+      setAllQuestions(prev => ({ ...prev, ...updatedQuestions }));
+      setCustomTabs(prev => Array.from(new Set([...prev, ...newCustomTabs])));
     } catch (err) { console.error("Load Error:", err); }
   };
 
@@ -156,8 +159,10 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
     
     try {
       // 1. 현재 작성 중인 질문지(extra_questions)
+      // 고정 탭은 질문지가 코드(DEFAULT_QUESTIONS)에서 관리되므로 DB에 저장하지 않음
+      const isCustomTab = !fixedTabs.includes(activeTab);
       const currentQuestions = allQuestions[activeTab] || [];
-      
+
       // 2. 현재 선택된 기업의 데이터 저장 (Upsert)
       const { error: mySaveError } = await supabase
         .from('startup_analysis')
@@ -168,21 +173,23 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
           scores: scores,
           total_score: Object.values(scores).reduce((a, b) => a + (Number(b) || 0), 0),
           comment: comment,
-          extra_questions: currentQuestions,
+          extra_questions: isCustomTab ? currentQuestions : null,
           updated_at: new Date().toISOString()
         }, { onConflict: 'startup_id, category' });
 
       if (mySaveError) throw mySaveError;
 
-      // 3. [동기화 핵심] 같은 폴더 내 다른 기업들에게도 질문지 텍스트(label, guide) 전파
-      // 단, 점수(scores)는 건드리지 않고 질문지 메타데이터만 업데이트합니다.
-      const { error: syncError } = await supabase
-        .from('startup_analysis')
-        .update({ extra_questions: currentQuestions })
-        .eq('folder_id', currentFolderId)
-        .eq('category', activeTab);
+      // 3. [동기화] 커스텀 탭인 경우에만 같은 폴더 내 다른 기업들에게 질문지 전파
+      // 점수(scores)는 건드리지 않고 질문지 메타데이터만 업데이트합니다.
+      if (isCustomTab) {
+        const { error: syncError } = await supabase
+          .from('startup_analysis')
+          .update({ extra_questions: currentQuestions })
+          .eq('folder_id', currentFolderId)
+          .eq('category', activeTab);
 
-      if (syncError) console.error("Sync Warning:", syncError);
+        if (syncError) console.error("Sync Warning:", syncError);
+      }
 
       alert(`[${activeTab}] 저장이 완료되었습니다.`);
       await loadAllData();

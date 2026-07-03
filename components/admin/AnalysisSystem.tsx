@@ -97,10 +97,23 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
       }
 
       // 아직 DB에 저장되지 않은(방금 추가한) 커스텀 탭과 질문지는 유지하면서 병합
-      setAllQuestions(prev => ({ ...prev, ...updatedQuestions }));
+      // 커스텀 탭인데 질문이 하나도 없으면(과거에 빈 상태로 저장된 경우) 빈 질문 5개를 채워줌
+      setAllQuestions(prev => {
+        const merged = { ...prev, ...updatedQuestions };
+        newCustomTabs.forEach(tab => {
+          if (!merged[tab] || merged[tab].length === 0) {
+            merged[tab] = createBlankQuestions();
+          }
+        });
+        return merged;
+      });
       setCustomTabs(prev => Array.from(new Set([...prev, ...newCustomTabs])));
     } catch (err) { console.error("Load Error:", err); }
   };
+
+  const createBlankQuestions = () => [1, 2, 3, 4, 5].map(num => ({
+    id: `plus_${Date.now()}_${num}`, label: '', guide: '', isExtra: true
+  }));
 
   const handleAddCategory = () => {
     const newTabName = prompt("새로운 평가 카테고리 이름을 입력하세요.");
@@ -110,11 +123,16 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
       return;
     }
     setCustomTabs(prev => [...prev, newTabName]);
-    const initialSet = [1, 2, 3, 4, 5].map(num => ({
-      id: `plus_${Date.now()}_${num}`, label: '', guide: '', isExtra: true
-    }));
-    setAllQuestions(prev => ({ ...prev, [newTabName]: initialSet }));
+    setAllQuestions(prev => ({ ...prev, [newTabName]: createBlankQuestions() }));
     setActiveTab(newTabName);
+  };
+
+  // 커스텀 탭에 질문 행을 하나씩 추가
+  const handleAddQuestion = () => {
+    setAllQuestions(prev => ({
+      ...prev,
+      [activeTab]: [...(prev[activeTab] || []), { id: `plus_${Date.now()}`, label: '', guide: '', isExtra: true }]
+    }));
   };
 
   const handleRenameCategory = async (oldName: string) => {
@@ -222,7 +240,12 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
       </div>
 
       <div className="bg-white border border-slate-300 shadow-sm rounded-sm">
-        <div className="p-5 bg-slate-50 border-b border-slate-300 flex justify-between items-center"><h3 className="font-black text-xl text-slate-800 tracking-tight">[{activeTab}] 상세 진단</h3></div>
+        <div className="p-5 bg-slate-50 border-b border-slate-300 flex justify-between items-center">
+          <h3 className="font-black text-xl text-slate-800 tracking-tight">[{activeTab}] 상세 진단</h3>
+          {!fixedTabs.includes(activeTab) && (
+            <button onClick={handleAddQuestion} className="px-4 py-2 bg-white border border-slate-300 text-slate-600 text-[13px] font-bold rounded-sm hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all">+ 질문 추가</button>
+          )}
+        </div>
         <table className="w-full border-collapse">
           <thead><tr className="bg-[#f8fafc] text-slate-700 text-[12px] font-black border-b border-slate-300"><th className="p-4 w-[25%] text-center border-r border-slate-300">질문사항</th><th className="p-4 w-[12%] text-center border-r border-slate-300">점수</th><th className="p-4 w-[63%] text-center">배점기준</th></tr></thead>
           <tbody>
@@ -230,7 +253,7 @@ export default function AnalysisSystem({ selectedItem, onClose, onSave }: Analys
               <tr key={q.id} className="border-b border-slate-300 last:border-b-0 hover:bg-slate-50/30 transition-colors">
                 <td className="p-5 font-bold border-r border-slate-300 bg-slate-50/20"><input type="text" value={q.label} onChange={(e) => updateQuestionText(q.id, 'label', e.target.value)} placeholder="질문 내용을 입력하세요" className="w-full p-2 border-b border-transparent font-bold bg-transparent outline-none focus:border-blue-500 transition-all" /></td>
                 <td className="p-4 text-center border-r border-slate-300"><div className="flex flex-col items-center gap-1"><input type="number" min="0" max="10" value={scores[q.id] || ''} onChange={(e) => handleScoreChange(q.id, e.target.value)} className="w-16 h-12 text-center text-2xl font-black text-blue-600 bg-white border-2 border-slate-100 rounded-xl outline-none focus:border-blue-400" placeholder="0" /><span className="text-[10px] font-bold text-slate-300">Max 10</span></div></td>
-                <td className="p-4"><textarea value={q.guide} onChange={(e) => updateQuestionText(q.id, 'guide', e.target.value)} placeholder="평가 기준을 입력하세요." className="w-full min-h-[110px] p-4 border border-slate-100 text-[13px] outline-none focus:border-blue-300 bg-white/50 rounded-lg resize-none" /></td>
+                <td className="p-4"><textarea value={q.guide} onChange={(e) => updateQuestionText(q.id, 'guide', e.target.value)} placeholder="평가 기준을 입력하세요." className="w-full min-h-[110px] p-4 border border-slate-100 text-[13px] outline-none focus:border-blue-3.00 bg-white/50 rounded-lg resize-none" /></td>
               </tr>
             ))}
           </tbody>

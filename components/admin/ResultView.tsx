@@ -15,11 +15,11 @@ interface ResultViewProps {
 
 // 시스템 기본 고정 질문 라벨 매핑 (AnalysisSystem의 DEFAULT_QUESTIONS와 매칭)
 const QUESTION_LABELS: Record<string, string> = {
-  biz_1: '비즈니스 확장성 (Scalability)', biz_2: '수익 건전성', biz_3: '매출 성장속도', biz_4: '시장 점유 확대', biz_5: '운영 시스템화',
-  team_1: 'C-level 리더십', team_2: '중간관리 조직', team_3: '핵심인재 유지/채용', team_4: '데이터 기반 의사결정', team_5: '조직 확장 유연성',
-  tech_1: '기술적 해자(Moat)', tech_2: '시스템 안정성', tech_3: '데이터 자산화', tech_4: 'R&D 실행 속도', tech_5: '기술 부채 관리',
-  mkt_1: '시장 침투 속도', mkt_2: '고객 락인(Lock-in)', mkt_3: '진입 장벽', mkt_4: '시장 트렌드 주도권', mkt_5: '마케팅 효율성',
-  fin_1: '특허 포트폴리오의 전략성', fin_2: '특허 주체 및 권리 안정성', fin_3: '기술 사업화 수준', fin_4: 'IP 리스크 관리 체계', fin_5: '기술사업화 전략',
+  biz_1: 'BM 고도화 수준', biz_2: '수익성', biz_3: '매출 성장성', biz_4: '판로 개척', biz_5: '생산 능력',
+  team_1: '대표자 유관 경력', team_2: '팀워크 역량', team_3: '핵심 개발 인력', team_4: '핵심 경영진 역량', team_5: '회사 구성원의 전문성',
+  tech_1: '기술개발 완성도', tech_2: '유사 및 대체 기술 출현 가능성', tech_3: '기술의 경쟁력', tech_4: '모방 난이도', tech_5: '기술의 확장성',
+  mkt_1: '시장 성장성', mkt_2: '시장 경쟁도', mkt_3: '고객 충성도(Lock-in)', mkt_4: '국내 및 글로벌 시장 규모', mkt_5: '시장 진입장벽',
+  fin_1: '특허 포트폴리오의 전략성', fin_2: '해외 특허 출원 및 등록', fin_3: '특허 포트폴리오 주관성/유관성', fin_4: 'IP 보호전략(특허 제외)', fin_5: '기술사업화 전략',
   glo_1: '글로벌 시장 적합성', glo_2: '글로벌 파트너십 확장성', glo_3: '해외 트랙션', glo_4: '글로벌 인적 인프라', glo_5: '글로벌 규제 및 수출 체계'
 };
 
@@ -34,6 +34,7 @@ const INVESTMENT_STAGES = [
 export default function ResultView({ startupId, refreshTrigger }: ResultViewProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const investTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const futureTextareaRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
   const [data, setData] = useState<any>(null);
   const [financials, setFinancials] = useState<any[]>([]);
   const [detailedScores, setDetailedScores] = useState<any[]>([]);
@@ -173,14 +174,20 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
     fetchData();
   }, [startupId, refreshTrigger]);
 
-  // 투자 로드맵 텍스트 양에 맞춰 입력창 높이 자동 조절
+  // 투자 로드맵/향후 전략 텍스트 양에 맞춰 입력창 높이 자동 조절
   useEffect(() => {
     const el = investTextareaRef.current;
     if (el) {
       el.style.height = 'auto';
       el.style.height = Math.max(60, el.scrollHeight) + 'px';
     }
-  }, [investComment, loading]);
+    futureTextareaRefs.current.forEach((ta) => {
+      if (ta) {
+        ta.style.height = 'auto';
+        ta.style.height = Math.max(105, ta.scrollHeight) + 'px';
+      }
+    });
+  }, [investComment, futurePlans, loading]);
 
   if (loading) return null;
 
@@ -421,7 +428,15 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
                 {futurePlans.map((plan, idx) => (
                   <div key={idx} className="future-input-group">
                     <input className="future-title-input" value={plan.title} onChange={(e) => handlePlanChange(idx, 'title', e.target.value)} />
-                    <textarea className="future-content-textarea" value={plan.content} onChange={(e) => handlePlanChange(idx, 'content', e.target.value)} placeholder="향후 전략 및 방향을 입력하세요..." />
+                    <textarea
+                      ref={(el) => { futureTextareaRefs.current[idx] = el; }}
+                      className="future-content-textarea"
+                      value={plan.content}
+                      onChange={(e) => handlePlanChange(idx, 'content', e.target.value)}
+                      placeholder="향후 전략 및 방향을 입력하세요..."
+                    />
+                    {/* 인쇄(PDF) 시에는 textarea 대신 전체 텍스트 박스를 사용 (잘림 방지) */}
+                    <div className="future-content-print">{plan.content}</div>
                   </div>
                 ))}
               </div>
@@ -499,9 +514,10 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
         .score-bar-fill { height: 100%; background: #3b82f6; }
 
         .future-input-container { display: flex; flex-direction: column; gap: 10px; }
-        .future-input-group { border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; height: 150px; display: flex; flex-direction: column; }
+        .future-input-group { border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; min-height: 150px; display: flex; flex-direction: column; }
         .future-title-input { font-size: 13px; font-weight: 900; color: #2563eb; border: none; border-bottom: 1px solid #f1f5f9; background: #f8fafc; padding: 10px; }
-        .future-content-textarea { width: 100%; flex-grow: 1; border: none; background: transparent; resize: none; outline: none; font-size: 9px; color: #334155; padding: 10px 12px; }
+        .future-content-textarea { width: 100%; flex-grow: 1; overflow: hidden; border: none; background: transparent; resize: none; outline: none; font-size: 9px; color: #334155; padding: 10px 12px; line-height: 1.5; }
+        .future-content-print { display: none; }
 
         .invest-opinion-textarea { width: 100%; min-height: 60px; overflow: hidden; border: 1px solid #66768b; background: #f1f5f9; border-radius: 3px; resize: none; outline: none; font-size: 11px; padding: 8px; line-height: 1.5; }
         .invest-opinion-print { display: none; }
@@ -521,6 +537,12 @@ export default function ResultView({ startupId, refreshTrigger }: ResultViewProp
             white-space: pre-wrap; word-break: break-word;
           }
           .future-input-group { border: 1.5px solid #cbd5e1 !important; }
+          .future-content-textarea { display: none !important; }
+          .future-content-print {
+            display: block !important; flex-grow: 1;
+            font-size: 9px; color: #334155; line-height: 1.5; padding: 10px 12px;
+            white-space: pre-wrap; word-break: break-word;
+          }
           tr, .analysis-card, .future-input-group, .radar-layout, .chart-container, .section-label, .dual-layout-grid { break-inside: avoid !important; }
         }
       `}</style>
